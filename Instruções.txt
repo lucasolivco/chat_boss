@@ -1,0 +1,90 @@
+===================================================================
+   🤖 CHATBOSS - GUIA DE INSTALAÇÃO E EXECUÇÃO
+===================================================================
+
+Este guia contém o passo a passo para configurar o projeto na sua máquina.
+
+PRÉ-REQUISITOS:
+1. Node.js instalado (Versão 18 ou superior).
+2. Git instalado.
+
+---
+PASSO 1: BAIXAR O PROJETO
+---
+1. Abra o terminal ou Git Bash.
+2. Clone o repositório:
+   git clone https://github.com/SEU_USUARIO/chatboss-tcc.git
+3. Entre na pasta:
+   cd chatboss-tcc
+
+---
+PASSO 2: CONFIGURAR O BACKEND (SERVIDOR)
+---
+(Responsável pela inteligência artificial)
+
+1. No terminal, entre na pasta do servidor:
+   cd server
+
+2. Instale as dependências:
+   npm install
+
+3. Crie o arquivo de senhas (.env):
+   - Crie um arquivo novo chamado ".env" dentro da pasta "server".
+   - Abra esse arquivo e cole o seguinte:
+
+   PORT=3000
+   GEMINI_API_KEY=Cole_Aqui_A_Chave_Do_Google_AI_Studio
+
+   (Obs: Se você não tem a chave, peça para a dupla ou gere uma grátis em aistudio.google.com)
+
+4. Rode o servidor:
+   node server.js
+
+   >> Se aparecer "🤖 ChatBoss rodando na porta 3000", DEIXE ESSE TERMINAL ABERTO.
+
+---
+PASSO 3: CONFIGURAR O FRONTEND (O JOGO)
+---
+(A interface visual onde jogamos)
+
+1. Abra um NOVO TERMINAL (não feche o anterior).
+2. Entre na pasta do cliente:
+   cd client
+   (Ou "cd chatboss-tcc/client" se abriu um terminal novo do zero)
+
+3. Instale as dependências:
+   npm install
+
+4. Configure o IP (.env):
+   - Crie um arquivo novo chamado ".env" dentro da pasta "client".
+   - Cole o endereço do backend.
+   
+   OPÇÃO A (Só no seu PC):
+   VITE_API_URL=http://localhost:3000
+
+   OPÇÃO B (Para testar no Celular via Wi-Fi):
+   Descubra o IP do seu PC (ex: 192.168.1.50) e coloque:
+   VITE_API_URL=http://192.168.1.50:3000
+
+5. Rode o jogo:
+   npm run dev -- --host
+
+---
+PASSO 4: COMO ACESSAR
+---
+Depois de rodar o passo 3, o terminal vai mostrar os links:
+
+- No Computador: Clique no link "Local" (geralmente http://localhost:5173).
+- No Celular: Conecte no mesmo Wi-Fi e acesse o link "Network" que aparece no terminal.
+
+---
+SOLUÇÃO DE PROBLEMAS
+---
+1. "Erro de conexão com o Boss":
+   Verifique se você esqueceu de rodar o Passo 2 (node server.js).
+
+2. Erro "404 Not Found" no servidor:
+   A chave do Google pode estar errada ou o modelo de IA mudou.
+
+3. Tela branca ou erro no navegador:
+   Aperte F12 para ver o Console e mande o print do erro.

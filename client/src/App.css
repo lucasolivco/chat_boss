@@ -1,0 +1,175 @@
+/* client/src/App.css */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --neon-green: #0f0;
+  --neon-red: #ff0055;
+  --neon-blue: #00ffff;
+  --bg-dark: #050505;
+  --panel-bg: #111;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--neon-green);
+  font-family: 'Press Start 2P', monospace;
+  margin: 0;
+  height: 100vh;
+  /* MÁGICA DE CENTRALIZAÇÃO DA PÁGINA: */
+  display: flex;
+  align-items: center;     /* Centraliza Verticalmente */
+  justify-content: center; /* Centraliza Horizontalmente */
+  overflow: hidden;
+}
+
+.game-container {
+  width: 100%;
+  max-width: 900px; /* Um pouco mais largo */
+  height: 95vh;     /* Não ocupa 100% para dar uma margem bonita */
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+
+
+ /* Borda para parecer uma tela de jogo */
+
+
+}
+
+/* === ÁREA DO BOSS (Centralizada) === */
+.boss-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.boss-img {
+  width: 320px; /* Tamanho bom para não esconder o chat */
+  height: 320px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transition: all 0.1s;
+  filter: drop-shadow(0 0 20px rgba(0, 255, 0, 0.1));
+}
+
+/* Animações (Iguais às anteriores) */
+@keyframes mecha-breathe {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes mecha-damage {
+  0% { transform: translate(0); filter: sepia(1) hue-rotate(-50deg) saturate(3); }
+  20% { transform: translate(-5px, 5px); }
+  40% { transform: translate(5px, -5px); }
+  60% { transform: translate(-5px, -5px); }
+  80% { transform: translate(5px, 5px); }
+  100% { transform: translate(0); filter: none; }
+}
+@keyframes mecha-attack {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); filter: brightness(1.5) drop-shadow(0 0 10px red); }
+  100% { transform: scale(1); }
+}
+@keyframes mecha-death {
+  to { filter: grayscale(1) brightness(0.2); transform: translateY(50px) rotate(10deg); }
+}
+
+.boss-img.idle { animation: mecha-breathe 4s infinite ease-in-out; }
+.boss-img.hit { animation: mecha-damage 0.5s linear; }
+.boss-img.attack { animation: mecha-attack 0.4s ease-out; }
+.boss-img.dead { animation: mecha-death 2s forwards; }
+
+/* Barra de Vida Boss */
+.boss-stats {
+  width: 100%;
+  max-width: 500px; /* Limita a largura da barra */
+  text-align: center;
+}
+
+.hp-bar-container {
+  width: 100%;
+  height: 24px;
+  background: #222;
+  border: 2px solid #fff;
+  margin-top: 5px;
+  position: relative; /* Para colocar o texto por cima se quiser */
+}
+.hp-bar-fill { height: 100%; background: var(--neon-red); transition: width 0.3s; }
+
+/* Texto de HP Numérico */
+.hp-text {
+  font-size: 0.8rem;
+  margin-top: 5px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* === HUD DO JOGADOR (Centralizado) === */
+.player-hud {
+  display: flex;
+  flex-direction: column; /* Empilha texto e barra */
+  align-items: center;    /* Centraliza */
+  justify-content: center;
+  margin: 10px 0;
+  color: var(--neon-blue);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.life-pip-container { 
+  display: flex; 
+  gap: 5px; 
+  margin-top: 5px;
+}
+.life-pip {
+  width: 25px; height: 15px; /* Pips maiores */
+  background: #222;
+  border: 1px solid #444;
+  transform: skewX(-15deg);
+}
+.life-pip.full {
+  background: var(--neon-blue);
+  box-shadow: 0 0 8px var(--neon-blue);
+  border-color: #fff;
+}
+
+/* === CHAT LOG === */
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  border: 2px solid #333;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 15px;
+  margin-bottom: 15px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  border-radius: 5px;
+}
+.message { margin-bottom: 15px; padding: 10px; border-radius: 4px; }
+.message.player { text-align: right; border-right: 3px solid var(--neon-green); background: rgba(0, 255, 0, 0.05); }
+.message.boss { text-align: left; border-left: 3px solid var(--neon-red); background: rgba(255, 0, 0, 0.05); }
+
+.dmg-tag { display: block; font-weight: bold; margin-top: 5px; font-size: 0.7rem; }
+.dmg-tag.win { color: var(--neon-green); }
+.dmg-tag.lose { color: var(--neon-red); }
+.feedback-mini { color: #aaa; font-style: italic; margin-top: 5px; font-size: 0.7rem; border-top: 1px dashed #444; padding-top: 5px; }
+
+/* === INPUT === */
+.input-box { display: flex; gap: 10px; height: 60px; width: 100%; }
+textarea {
+  flex: 1; background: #111; color: var(--neon-green);
+  border: 2px solid var(--neon-green); font-family: inherit; padding: 10px; resize: none; font-size: 0.8rem;
+}
+button {
+  background: var(--neon-green); color: #000; border: none; font-family: inherit;
+  cursor: pointer; padding: 0 30px; font-weight: bold; transition: 0.2s; font-size: 1rem;
+}
+button:hover:not(:disabled) { background: #fff; transform: scale(1.05); }
+button:disabled { background: #555; cursor: not-allowed; }
+
+/* Efeito Game Over */
+.shake-screen { animation: mecha-damage 0.5s; filter: grayscale(1); }
