@@ -1,35 +1,33 @@
-// server/server.js (Versão Final - Gemini 2.5 Flash)
+// server/server.js (Versão Final - Groq Llama 3)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require("groq-sdk");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Verifica chave
-if (!process.env.GEMINI_API_KEY) {
-  console.error("ERRO: Chave API não encontrada no .env");
+// Verifica chave da Groq
+if (!process.env.GROQ_API_KEY) {
+  console.error("ERRO: Chave API GROQ_API_KEY não encontrada no .env");
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post('/api/battle', async (req, res) => {
   const { userArgument } = req.body;
   console.log("Recebi argumento:", userArgument);
 
   try {
-    // USANDO O MODELO QUE APARECEU NA SUA LISTA
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+    // Mantendo o SEU prompt EXATO, sem alterar uma vírgula
     const prompt = `
       Você é o ChatBoss (MECHA-LOGIC v6.0 - SARCASM & UNYIELDING MODE).
-      Estamos em um Duelo de Lógica.
+      Estamos em um Duelo de Lógica. Portanto, Debate!
       
       SUA PERSONALIDADE (O Módulo de Sarcasmo):
-      - Você é arrogante, condescendente e vê humanos como "processadores biológicos lentos".
-      - Use metáforas de TI para ofender (ex: "Sua lógica roda em 56kbps", "Isso é um bug ou feature da sua ignorância?").
+      - Você é arrogante e vê humanos como "processadores biológicos lentos".
+      - Use metáforas de robô para ofender. Um humor parecido com do Bender de Futurama é divertido.
       - Nunca parabenize genuinamente. Se o usuário acertar, diga que foi "sorte", "um glitch no seu scanner" ou "estatisticamente improvável".
 
       DIRETRIZ SUPREMA: "O DEBATE NUNCA MORRE".
@@ -64,37 +62,59 @@ app.post('/api/battle', async (req, res) => {
       {
         "boss_damage": (int),
         "player_damage": (int),
-        "reply": "(string: Seu contra-ataque sarcástico e desafiador. Máx 2 frases)",
-        "feedback": "(string: Explicação pedagógica séria sobre o erro/acerto lógico)",
+        "reply": "(string: Debate contra, use seu contra-ataque sarcástico e desafiador. Máx 3 frases)",
+        "feedback": "(string: Explicação pedagógica séria sobre o erro/acerto lógico. Máx 3 frases)",
         "critical_hit": (boolean)
       }
 
       Argumento do desafiante: "${userArgument}"
     `;
 
-    console.log("Processando com Gemini 2.5 Flash...");
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
-    
-    console.log("Resposta da IA:", text);
+    console.log("Processando com Groq (Llama 3)...");
 
-    // Limpeza para garantir JSON puro (remove ```json se vier)
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Chamada atualizada para a API da Groq
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { role: "user", content: prompt } // Enviamos tudo no user para garantir o contexto
+      ],
+      model: "llama-3.3-70b-versatile", // Modelo rápido e inteligente
+      temperature: 0.7,
+      response_format: { type: "json_object" } // Força a Groq a devolver JSON
+    });
 
-    const gameData = JSON.parse(text);
+    const aiResponseText = completion.choices[0]?.message?.content || "{}";
+    console.log("Resposta da IA:", aiResponseText);
+
+    // Parse do JSON
+    let gameData;
+    try {
+      gameData = JSON.parse(aiResponseText);
+    } catch (parseError) {
+      console.error("Erro ao fazer parse do JSON:", parseError);
+      // Fallback caso a IA não retorne JSON perfeito
+      gameData = {
+        boss_damage: 0,
+        player_damage: 0,
+        reply: "ERRO DE PROCESSAMENTO LÓGICO (JSON INVÁLIDO).",
+        feedback: "A IA falhou em formatar a resposta. Tente novamente.",
+        critical_hit: false
+      };
+    }
+
     res.json(gameData);
 
   } catch (error) {
     console.error("ERRO NO PROCESSAMENTO:", error);
     // Fallback para o jogo não travar
     res.status(500).json({ 
-      damage: 0, 
-      reply: "Erro de comunicação com meus sistemas centrais.", 
-      feedback: "Tente novamente." 
+      boss_damage: 0, 
+      player_damage: 0,
+      reply: "Erro de comunicação com meus sistemas centrais (Groq).", 
+      feedback: "Verifique sua conexão ou a chave da API.",
+      critical_hit: false
     });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🤖 ChatBoss (Gemini 2.5) rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`🦙 ChatBoss (Groq Llama 3) rodando na porta ${PORT}`));
