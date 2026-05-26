@@ -1,5 +1,16 @@
+# Sistema
 .DS_Store
-node_modules/
-.env
 
+# Dependências
+node_modules/
+
+# Segredos — NUNCA commitar
+.env
+.env.local
+
+# Claude Code (instrução interna, não vai pro repo)
 CLAUDE.md
+
+# v2 — em desenvolvimento separado, fora deste repo por enquanto
+client-v2/
+server-v2/
