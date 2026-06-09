@@ -34,3 +34,27 @@ CREATE TABLE IF NOT EXISTS user_stats (
   title VARCHAR(100) DEFAULT 'Iniciante Lógico',
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ─── Baralho Lógico / coleta de dados para o TCC ──────────────────────────────
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS card_type VARCHAR(20);
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS play_valid BOOLEAN;
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS response_time_ms INT;
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS game_phase INT DEFAULT 1;
+
+-- ─── HP persistente (servidor é fonte de verdade) ─────────────────────────────
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS current_boss_hp INT DEFAULT 100;
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS current_player_hp INT DEFAULT 100;
+
+-- ─── Fase 2 (Modal Flash): gabarito da opção correta guardado no servidor ──────
+-- Integridade acadêmica: o cliente nunca recebe is_correct. O servidor grava aqui
+-- o snapshot da opção correta do ataque atual e valida o selected_option_id contra ele.
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS current_expected_option JSONB;
+
+-- ─── Assessments (dados de pesquisa TCC) ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS assessments (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  phase VARCHAR(10) NOT NULL,
+  score INT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
