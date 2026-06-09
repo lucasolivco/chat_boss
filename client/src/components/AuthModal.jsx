@@ -1,24 +1,25 @@
 import { useState } from 'react';
-import { Zap, UserPlus, BookOpen, Loader2, LogIn, X } from 'lucide-react';
+import { Zap, Loader2, User, X } from 'lucide-react';
 
 const API = '';
 
-export default function AuthModal({ onLogin, onGuest, onHowToPlay }) {
-  const [mode, setMode] = useState('login');
+export default function AuthModal({ onLogin }) {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
+    const name = username.trim();
+    if (!name) { setError('Digite um apelido para entrar.'); return; }
+    if (name.length < 2) { setError('Apelido deve ter pelo menos 2 caracteres.'); return; }
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/${mode}`, {
+      const res = await fetch(`${API}/api/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: name }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Erro desconhecido.'); return; }
@@ -33,54 +34,29 @@ export default function AuthModal({ onLogin, onGuest, onHowToPlay }) {
   return (
     <div className="modal-overlay">
       <div className="modal-box auth-modal">
-        <h2 className="modal-title">
-          {mode === 'login'
-            ? <><LogIn size={16} strokeWidth={2} /> Entrar na Arena</>
-            : <><UserPlus size={16} strokeWidth={2} /> Criar Conta</>}
-        </h2>
-
-        <div className="auth-toggle">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); }}>Login</button>
-          <button className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setError(''); }}>Criar conta</button>
+        <div className="auth-header">
+          <div className="auth-icon"><User size={32} strokeWidth={1.4} /></div>
+          <h2 className="auth-title">IDENTIFICAÇÃO DE COMBATENTE</h2>
+          <p className="auth-subtitle">Como quer ser chamado durante o duelo?</p>
         </div>
 
         <form className="auth-form" onSubmit={submit}>
           <input
             type="text"
-            placeholder="Username"
+            placeholder="Seu apelido..."
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => { setUsername(e.target.value); setError(''); }}
             autoFocus
-            maxLength={50}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
+            maxLength={30}
             required
           />
           {error && <p className="auth-error"><X size={12} /> {error}</p>}
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn-primary" disabled={loading || !username.trim()}>
             {loading
-              ? <><Loader2 size={14} className="spin" /> Processando...</>
-              : mode === 'login'
-                ? <><Zap size={14} strokeWidth={2.2} /> Entrar</>
-                : <><UserPlus size={14} strokeWidth={2.2} /> Criar conta</>}
+              ? <><Loader2 size={14} className="spin" /> Entrando...</>
+              : <><Zap size={14} strokeWidth={2.2} /> ENTRAR NA ARENA</>}
           </button>
         </form>
-
-        <div className="auth-divider">ou</div>
-
-        <button className="btn-ghost" onClick={onGuest}>
-          Jogar sem conta <span className="ghost-note">(progresso não salvo)</span>
-        </button>
-
-        <button className="btn-link" onClick={onHowToPlay}>
-          <BookOpen size={12} /> Como funciona o jogo?
-        </button>
       </div>
     </div>
   );

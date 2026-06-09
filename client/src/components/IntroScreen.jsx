@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Swords, BookOpen, Cpu, BarChart3, AlertTriangle, Trophy } from 'lucide-react';
+import { Swords, Cpu, BarChart3, AlertTriangle, Trophy } from 'lucide-react';
 
 const TITLE_TEXT = 'CHATBOSS';
 
-export default function IntroScreen({ onStart, onHowToPlay }) {
+export default function IntroScreen({ onStart }) {
   const [displayed, setDisplayed] = useState('');
   const [showSub, setShowSub] = useState(false);
   const [showButtons, setShowButtons] = useState(false);
@@ -52,9 +52,6 @@ export default function IntroScreen({ onStart, onHowToPlay }) {
           <div className="intro-buttons fade-in">
             <button className="btn-primary pulse" onClick={onStart}>
               <Swords size={16} strokeWidth={2.2} /> INICIAR DUELO
-            </button>
-            <button className="btn-secondary" onClick={onHowToPlay}>
-              <BookOpen size={13} strokeWidth={2} /> Como Argumentar?
             </button>
           </div>
         )}
