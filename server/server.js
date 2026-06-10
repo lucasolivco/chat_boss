@@ -691,9 +691,14 @@ PROIBIDO frases genéricas E PROIBIDO densidade acadêmica. Cada ataque é uma z
 ${BOSS_STYLE_GUIDE}
 Aplique esse estilo de voz aos textos de ataque ("text"), aos "feedback_text" das opções e ao "phase3_context": tudo curto, leve, com memes/clichês do tema. O ataque é arrogante e cômico; os feedbacks ensinam de forma simples e direta.
 
+⚠️ REGRA DE ABERTURA (CRÍTICO): o MECHA-LOGIC ATACA PRIMEIRO — o jogador AINDA NÃO FALOU NADA.
+Portanto os textos das Fases 1 e 2 são AFIRMAÇÕES DE ABERTURA do Boss. É PROIBIDO escrever "seu argumento",
+"você disse", "sua tese", "como você afirmou" ou reagir a uma fala do jogador que não existe. O Boss
+apresenta a PRÓPRIA posição (falaciosa) sobre o tema, provocando o jogador a identificar/refutar.
+
 ═══ DEFINIÇÕES RÍGIDAS DAS FALÁCIAS (siga ao pé da letra — NÃO confunda os conceitos) ═══
 Use SOMENTE estes nomes, em pt-br, exatamente assim:
-- Espantalho: distorça ou EXAGERE deliberadamente uma opinião comum do tema para refutá-la facilmente (ataca uma versão caricata, não a real).
+- Espantalho: como o jogador ainda não falou, distorça/exagere uma OPINIÃO COMUM e bem conhecida do tema (uma versão caricata da posição popular) e ataque essa versão fraca. NUNCA distorça "o argumento do jogador" — ele não existe ainda. Ex (Pokémon): "Quem gosta de Pokémon água acha que é só jogar Surf e ganhar — que estratégia ridícula e rasa."
 - Generalização Apressada: use UM único caso isolado, uma experiência pessoal ou um detalhe ínfimo do tema e afirme que aquilo dita a regra para 100% do universo do tema.
 - Apelo à Autoridade Indevida: cite uma figura FAMOSA do tema opinando sobre algo FORA de sua área técnica, validando como verdade absoluta só pelo nome.
 - Bola de Neve: afirme que uma pequena ação no tema INEVITAVELMENTE causará um apocalipse ou consequência catastrófica, sem nexo causal direto entre os passos.
@@ -851,7 +856,8 @@ function repairArena(arena) {
     }
     opts.forEach(o => {
       if (o.is_correct) {
-        o.boss_damage   = Math.min(25, Math.max(20, o.boss_damage || 22));
+        // Orçamento de HP: 12 por acerto (Fase 2). Boss só zera em run perfeito.
+        o.boss_damage   = 12;
         o.player_damage = 0;
       } else {
         o.boss_damage   = 0;
@@ -860,6 +866,11 @@ function repairArena(arena) {
     });
     return { ...rest, options: opts };
   });
+
+  // Embaralha a ORDEM dos ataques dentro de cada fase: cada partida tem uma
+  // sequência de falácias diferente (o jogador não decora a ordem).
+  arena.phase1.sort(() => Math.random() - 0.5);
+  arena.phase2.sort(() => Math.random() - 0.5);
 
   return arena;
 }
@@ -1352,7 +1363,7 @@ app.post('/api/battle', async (req, res) => {
     const acertou = selected_logic.trim().toLowerCase() === correct_fallacy.trim().toLowerCase();
     const gameData = acertou
       ? {
-          boss_damage: 20, player_damage: 0, critical_hit: false,
+          boss_damage: 12, player_damage: 0, critical_hit: false,
           reply: `Correto. A falácia era mesmo ${correct_fallacy}. Não se acostume — meu próximo ataque será mais difícil de desmontar.`,
           feedback: `Você identificou ${correct_fallacy} corretamente. ${FALLACY_HINTS[correct_fallacy] ?? ''}`.trim(),
           toulmin_score: { claim: 0, data: 0, warrant: 0 },
@@ -1426,7 +1437,7 @@ app.post('/api/battle', async (req, res) => {
     const looksValid = words.length >= 6 && userArgument.trim().length >= 25;
     const gameData = looksValid
       ? {
-          boss_damage: 20, player_damage: 0, critical_hit: true,
+          boss_damage: 14, player_damage: 0, critical_hit: true,
           reply: '[MOCK] Argumento aceito pelo simulador. Estrutura coerente — o Boss real seria mais cruel.',
           feedback: '[MOCK] Avaliação simulada: claim/data/warrant razoáveis. Sem chamada de IA.',
           toulmin_score: { claim: 2, data: 2, warrant: 2 },
@@ -1505,6 +1516,11 @@ app.post('/api/battle', async (req, res) => {
       gameData.boss_damage = 0;
       gameData.player_damage = 25;
       gameData.critical_hit = false;
+    } else if (phase === 3 && gameData.boss_damage > 0) {
+      // Orçamento de HP: cada acerto da Fase 3 vale 14 (2 rounds = 28). Assim, com
+      // Fase 1 (12×3=36) + Fase 2 (12×3=36) + Fase 3 (14×2=28) = 100, o boss só
+      // zera num run PERFEITO. O dano do LLM é cosmético; o Toulmin é o que conta.
+      gameData.boss_damage = 14;
     }
 
     // HP + persistência + resposta (compartilhado com a Fase 1 determinística)

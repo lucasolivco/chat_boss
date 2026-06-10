@@ -44,21 +44,23 @@ O Boss **ataca primeiro** em cada fase via `GET /api/battle/boss-attack?phase=N`
 - **Determinístico no servidor** (~20ms, sem Groq). O gabarito nunca é exposto ao cliente
 - Foco em Toulmin: distinguir a jogada lógica válida das falaciosas
 
-### Fase 3 — Sobrecarga Socrática (Síntese guiada)
+### Fase 3 — Sobrecarga Socrática (Síntese guiada, 2 rounds)
 - Antes do combate: **Holo-Guia de Toulmin** (Exemplo Trabalhado obrigatório) com Claim/Data/Warrant coloridos
-- **Construtor de Sentenças (Mad Libs Cyberpunk):** o jogador escolhe 2 tokens conceituais → o jogo monta o andaime → ele digita só o **fechamento (≤140 chars)** num terminal hacker
+- **Round 1 — Contra-ataque guiado:** o jogador escolhe **uma Postura de Ataque** (andaime fixo e coeso) e digita só o fechamento (≤140 chars) num terminal hacker
+- **Round 2 — Golpe final autoral:** sem frases prontas — o jogador elabora o **argumento completo** (≤300 chars) sozinho
 - Botão flutuante `[👁 Ver Holo-Guia]` reabre o esquema a qualquer momento (gaveta lateral)
-- O texto final (andaime + autoria) vai ao Groq: validação anti-gibberish + pontuação Toulmin (coleta do TCC preservada)
-- Prompt mais exigente — pontuação severa
+- Os dois textos vão ao Groq: validação anti-gibberish + pontuação Toulmin (coleta do TCC preservada)
 
 ### Transições por Turnos Fixos
 ```
-Turnos:  1 2 3 │ 4 5 6 │ 7 8 9 → BattleReport
-Fase:      1   │   2   │   3
+Turnos:  1 2 3 │ 4 5 6 │ 7 8 → BattleReport
+Fase:      1   │   2   │  3
+                         (round 1 · round 2)
 ```
-- **9 turnos fixos** (3 por fase), gerenciados pelo contador `turnCount` em `useBattle.js`
+- **8 turnos fixos** (Fase 1: 3 · Fase 2: 3 · Fase 3: 2), gerenciados pelo contador `turnCount` em `useBattle.js`
 - Ao cruzar a fronteira (turnos 3→4 e 6→7), exibe `PhaseIntro`; a Fase 3 traz o Holo-Guia
-- **O HP é puramente cosmético** (barras, glitch, screen-shake) — o jogo NUNCA termina por HP=0
+- **O HP é puramente cosmético** (barras, glitch, screen-shake) — o jogo NUNCA termina por HP=0.
+  O dano é calibrado para o boss zerar **só num run perfeito** (Fase 1: 12×3 + Fase 2: 12×3 + Fase 3: 14×2 = 100)
 
 ---
 
@@ -73,15 +75,15 @@ Fase:      1   │   2   │   3
     ▼
 [ThemeSelection] — tema de TEXTO LIVRE (ex: Pokémon, Futebol, Cinema)
     │  └── "GERAR ARENA DE DUELO" → POST /api/battle/generate-arena
-    │        (1 chamada Groq gera os 9 turnos; tela de geração imersiva)
+    │        (1 chamada Groq/Gemini gera a arena; tela de geração imersiva)
     ▼
-[Game Arena — 9 turnos fixos servidos da arena pré-gerada]
+[Game Arena — 8 turnos fixos servidos da arena pré-gerada]
     │
     ├── Turnos 1-3 · Fase 1: grid de falácias (determinístico)
     ├── Turnos 4-6 · Fase 2: Modal Flash (3 réplicas, determinístico)
-    ├── Turnos 7-9 · Fase 3: Construtor de Sentenças (Groq + Toulmin)
+    ├── Turnos 7-8 · Fase 3: round 1 (postura) + round 2 (texto livre) (Groq + Toulmin)
     │
-    └── turnCount === 9 → [BattleReport] (saldo de HP = Perfil de Combate)
+    └── turnCount === 8 → [BattleReport] (saldo de HP = Perfil de Combate)
 ```
 
 > **Sem manual (HowToPlay).** Aprendizado orgânico via feedbacks curtos das cartas.
@@ -91,7 +93,7 @@ Fase:      1   │   2   │   3
 
 ## Integridade Acadêmica — HP Cosmético, Fim por Turnos
 
-**O frontend nunca envia `won_battle`.** O fim do jogo é decidido pelo contador de 9 turnos no front;
+**O frontend nunca envia `won_battle`.** O fim do jogo é decidido pelo contador de 8 turnos no front;
 o HP é apenas visual. O backend grava `won_battle` como **placar** e nunca dispara fim prematuro.
 
 ### Como funciona
@@ -99,18 +101,18 @@ o HP é apenas visual. O backend grava `won_battle` como **placar** e nunca disp
 1. O frontend envia o argumento/jogada ao `POST /api/battle` (com o turno atual em `game_phase`)
 2. O backend mantém o HP por `user_id` em `user_stats` (`current_boss_hp`, `current_player_hp`) — uso cosmético
 3. Após o dano do turno, atualiza os HPs (clamp em 0) e devolve `boss_hp`/`player_hp` para os efeitos visuais
-4. `won_battle` registra o **placar do turno** (`boss_hp < player_hp`); a linha do 9º turno = saldo final
-5. O backend **não envia `won`/`lost`** — o front encerra ao atingir o turno 9 e mostra o `BattleReport`
+4. `won_battle` registra o **placar do turno** (`boss_hp < player_hp`); a linha do 8º turno = saldo final
+5. O backend **não envia `won`/`lost`** — o front encerra ao atingir o turno 8 e mostra o `BattleReport`
 
 ```
 Frontend                       Backend
 ────────                       ───────
-turnCount++ (1..9)             calcula dano (determinístico ou Groq+Zod)
+turnCount++ (1..8)             calcula dano (determinístico ou Groq+Zod)
 envia jogada ────────────────► atualiza boss_hp/player_hp (cosmético, clamp 0)
                                won_battle = placar do turno (boss_hp < player_hp)
 ◄─── { dano, boss_hp, player_hp } retorna (SEM won/lost)
 reage visualmente
-turnCount === 9 → BattleReport (decisão 100% no front)
+turnCount === 8 → BattleReport (decisão 100% no front)
 ```
 
 ---
@@ -437,7 +439,7 @@ CB/
 
 | Método | Rota | Descrição |
 |---|---|---|
-| POST | `/api/battle/generate-arena` | **Pre-Generation Hack** — recebe `{ theme_text, user_id }`, gera os 9 turnos via Groq e grava em `user_stats.arena_data` |
+| POST | `/api/battle/generate-arena` | **Pre-Generation Hack** — recebe `{ theme_text, user_id }`, gera a arena (Fases 1-3) via Groq/Gemini e grava em `user_stats.arena_data` |
 | GET | `/api/battle/boss-attack?phase=N&turn=T&theme=TEMA` | Serve o ataque pré-gerado por índice (`turn % 3`), <20ms |
 | POST | `/api/battle` | Turno de batalha — avalia argumento, atualiza HP no banco, retorna resultado |
 | POST | `/api/session/reset` | Zera `current_boss_hp`/`current_player_hp` ao iniciar novo duelo |
@@ -486,7 +488,7 @@ Fluxo no servidor:
  10. won_battle = PLACAR do turno (boss_hp < player_hp). NÃO há fim por HP=0
  11. INSERT em battles (16 campos)
  12. UPDATE user_stats + calcTitle
- 13. Retorna gameData com boss_hp/player_hp (SEM won/lost — fim é decidido pelos 9 turnos no front)
+ 13. Retorna gameData com boss_hp/player_hp (SEM won/lost — fim é decidido pelos 8 turnos no front)
 ```
 
 > **`won_battle` nunca vem do frontend.** O campo só é escrito pelo backend.
@@ -634,7 +636,7 @@ CREATE TABLE user_stats (
   current_boss_hp   INT DEFAULT 100,         -- HP persistido no servidor
   current_player_hp INT DEFAULT 100,         -- HP persistido no servidor
   current_expected_option JSONB,             -- gabarito da opção correta da Fase 2 (Modal Flash)
-  arena_data        JSONB,                   -- Pre-Generation Hack: 9 turnos gerados pela IA (tema livre)
+  arena_data        JSONB,                   -- Pre-Generation Hack: arena (Fases 1-3) gerada pela IA (tema livre)
   arena_theme       TEXT,                    -- texto do tema digitado pelo jogador
   title             VARCHAR(100) DEFAULT 'Iniciante Lógico',
   updated_at        TIMESTAMP DEFAULT NOW()

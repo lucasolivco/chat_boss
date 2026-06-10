@@ -504,7 +504,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
    ARENA — GAME SCREEN
 ═══════════════════════════════════════════════════════════════ */
 .arena {
-  width: 100%; height: 100vh;
+  width: 100%; height: 100vh; height: 100dvh;
   display: grid; grid-template-rows: 56px 1fr;
   overflow: hidden; position: relative; background: var(--bg-deep);
 }
@@ -611,7 +611,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 
 /* ── Body layout ── */
 .arena-body {
-  display: grid; grid-template-columns: 1fr 320px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
   min-height: 0; overflow: hidden;
   position: relative; z-index: 1;
   max-width: 1440px; width: 100%; margin: 0 auto;
@@ -1557,10 +1557,16 @@ svg { flex-shrink: 0; vertical-align: middle; }
 /* ═══════════════════════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════════════════════ */
+/* Tablet / telas médias — encolhe a sidebar antes de escondê-la */
+@media (max-width: 1080px) and (min-width: 781px) {
+  .arena-body { grid-template-columns: minmax(0, 1fr) 260px; }
+  .arena-game { padding: .7rem .9rem; }
+}
+
 @media (max-width: 780px) {
   .arena-body { grid-template-columns: 1fr; }
   .arena-sidebar { display: none; }
-  .arena-game { padding: .5rem .7rem; }
+  .arena-game { padding: .5rem .7rem; border-right: none; }
   .boss-img { height: 17vh; min-height: 90px; }
   .msg { padding: .6rem; }
   .msg-text { font-size: .85rem; }
@@ -1573,66 +1579,98 @@ svg { flex-shrink: 0; vertical-align: middle; }
   .report-section { padding: 1rem 1.2rem; }
   .report-hero { padding: 1.5rem 1.2rem 1.2rem; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .posture-grid { grid-template-columns: 1fr; }
 }
 
+/* Telas pequenas em altura — compacta o boss para sobrar espaço ao chat */
+@media (max-height: 680px) {
+  .boss-img { height: 13vh; min-height: 76px; }
+  .boss-stage { padding-top: .4rem; }
+  .vs-bar { margin: .3rem 0; }
+}
+
+/* Celular bem estreito */
+@media (max-width: 420px) {
+  .arena-header { grid-template-columns: 1fr auto; }
+  .chat-log { padding: .7rem; }
+  .msg-text { font-size: .82rem; }
+  .flash-modal { width: 94vw; }
+}
+
+/* Telas grandes — alarga a arena e aumenta a legibilidade */
 @media (min-width: 1500px) {
-  .arena-body { grid-template-columns: 1fr 360px; }
+  .arena-body { max-width: 1680px; grid-template-columns: minmax(0, 1fr) 360px; }
   .boss-img { height: 23vh; max-height: 300px; }
   .boss-name-tag { font-size: 1.7rem; }
+  .msg-text { font-size: .98rem; }
+  .chat-log { padding: 1.3rem 1.6rem; }
+}
+
+/* Ultra-wide — não deixa a coluna do jogo esticar demais e centraliza */
+@media (min-width: 1920px) {
+  .arena-body { max-width: 1880px; grid-template-columns: minmax(0, 1fr) 400px; }
+  .boss-img { max-height: 340px; }
+  .msg-text { font-size: 1.02rem; }
 }
 
 /* ═══════════════════════════════════════════════════
    FASE 1 — Grid de múltipla escolha de falácia
 ════════════════════════════════════════════════════ */
 
+/* Cards de falácia (Fase 1) — mesmo visual dos itens do Modal Flash:
+   glassmorphism + borda-acento à esquerda + glow neon no hover. */
 .fallacy-choice-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: .55rem;
-  padding: .5rem 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  padding: .4rem 0;
 }
 
 .fallacy-choice-btn {
   display: flex;
   align-items: flex-start;
-  gap: .55rem;
-  background: rgba(229,25,46,0.07);
-  border: 1px solid rgba(229,25,46,0.25);
-  border-radius: 8px;
-  padding: .75rem .9rem;
-  color: var(--t-1);
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+  gap: .65rem;
   text-align: left;
+  padding: .85rem .9rem;
+  cursor: pointer;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--b-line);
+  border-left: 3px solid var(--crimson);
+  border-radius: 10px;
+  color: #dfe6f5;
+  font-family: var(--font-mono);
+  transition: background .15s, box-shadow .15s, border-color .15s, transform .15s;
 }
 .fallacy-choice-btn:hover:not(:disabled) {
-  background: rgba(229,25,46,0.16);
-  border-color: var(--crimson);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 0 18px -4px var(--crimson);
+  border-color: rgba(229,25,46,0.5);
   transform: translateY(-1px);
 }
 .fallacy-choice-btn:disabled { opacity: .45; cursor: not-allowed; }
-.fallacy-choice-icon { color: var(--crimson); flex-shrink: 0; margin-top: 1px; }
+.fallacy-choice-icon { color: var(--crimson); flex-shrink: 0; margin-top: 2px; }
 
 .fallacy-choice-content {
   display: flex;
   flex-direction: column;
-  gap: .2rem;
+  gap: .25rem;
+  min-width: 0;
 }
 .fallacy-choice-name {
-  font-size: .82rem;
-  font-weight: 600;
-  color: var(--t-1);
+  font-size: .85rem;
+  font-weight: 700;
+  color: #eaf0ff;
   line-height: 1.2;
+  letter-spacing: .01em;
 }
 .fallacy-choice-desc {
   font-size: .72rem;
   color: var(--t-3);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 .fallacy-choice-btn:hover:not(:disabled) .fallacy-choice-desc { color: var(--t-2); }
 
-@media (max-width: 500px) {
+@media (max-width: 560px) {
   .fallacy-choice-grid { grid-template-columns: 1fr; }
 }
 
@@ -2860,6 +2898,29 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .builder-fire:hover:not(:disabled) { filter: brightness(1.12); }
 .builder-fire:active:not(:disabled) { transform: translateY(1px); }
 .builder-fire:disabled { opacity: .4; cursor: default; }
+
+/* Fase 3 — rótulo do round + textarea livre (round 2) */
+.builder-round-tag {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: .4rem;
+  margin-bottom: .7rem; padding: .3rem .7rem;
+  font-family: var(--font-mono); font-size: .64rem; letter-spacing: .12em;
+  color: var(--ice); text-transform: uppercase;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.3); border-radius: 999px;
+}
+.builder-round-final {
+  color: var(--crimson);
+  background: rgba(229,25,46,0.09);
+  border-color: rgba(229,25,46,0.4);
+}
+.builder-free-hint {
+  font-size: .76rem; line-height: 1.5; color: #aeb9d0; margin: 0 0 .6rem;
+}
+.author-input-free {
+  min-height: 92px;
+  font-size: .92rem;
+}
 
 /* ─── BRIEFING (sidebar) ────────────────────────────────────────────────────── */
 .briefing-theme, .briefing-phase, .briefing-progress { margin-top: .7rem; }

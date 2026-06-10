@@ -207,41 +207,18 @@ const POSTURES = [
   },
 ];
 
-function Phase3Builder({ onPlay, disabled }) {
-  const [posture, setPosture] = useState(null);     // postura única selecionada
-  const [author, setAuthor]   = useState('');       // desfecho autoral (≤140)
-  const [guideOpen, setGuideOpen] = useState(false);
+const MAX_FREE = 300;
 
-  const ready = !!posture && author.trim().length >= 8;
-
-  const choosePosture = (p) => {
-    if (disabled) return;
-    setPosture(prev => (prev?.id === p.id ? null : p));
-  };
-
-  const fire = () => {
-    if (!ready || disabled) return;
-    // Concatena o andaime fixo da postura com o desfecho digitado pelo aluno.
-    const unified = `${posture.scaffold} ${author.trim()}`;
-    onPlay({ cardType: null, text: unified });
-    setPosture(null);
-    setAuthor('');
-  };
-
+// Gaveta/FAB do Holo-Guia, reusado nos dois rounds da Fase 3.
+function HoloFab() {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="builder">
-      {/* Botão flutuante do Holo-Guia */}
-      <button
-        type="button"
-        className="holo-fab"
-        onClick={() => setGuideOpen(o => !o)}
-      >
+    <>
+      <button type="button" className="holo-fab" onClick={() => setOpen(o => !o)}>
         <Eye size={14} strokeWidth={2} /> Ver Holo-Guia
       </button>
-
-      {/* Gaveta lateral com o esquema de Toulmin (não re-renderiza a autoria) */}
       <AnimatePresence>
-        {guideOpen && (
+        {open && (
           <motion.aside
             className="holo-drawer"
             initial={{ x: '100%', opacity: 0.4 }}
@@ -251,14 +228,34 @@ function Phase3Builder({ onPlay, disabled }) {
           >
             <div className="holo-drawer-head">
               <span><Eye size={14} /> HOLO-GUIA TÁTICO</span>
-              <button className="flash-close" onClick={() => setGuideOpen(false)} aria-label="Fechar"><X size={16} /></button>
+              <button className="flash-close" onClick={() => setOpen(false)} aria-label="Fechar"><X size={16} /></button>
             </div>
             <HoloGuide compact />
           </motion.aside>
         )}
       </AnimatePresence>
+    </>
+  );
+}
 
-      {/* Passo 1 — Postura de Ataque Lógico (seleção única) */}
+// ── Round 1 da Fase 3 — Postura + desfecho (frases prontas) ──────────────────
+function Phase3Postures({ onPlay, disabled }) {
+  const [posture, setPosture] = useState(null);
+  const [author, setAuthor]   = useState('');
+  const ready = !!posture && author.trim().length >= 8;
+
+  const choosePosture = (p) => { if (!disabled) setPosture(prev => (prev?.id === p.id ? null : p)); };
+  const fire = () => {
+    if (!ready || disabled) return;
+    onPlay({ cardType: null, text: `${posture.scaffold} ${author.trim()}` });
+    setPosture(null); setAuthor('');
+  };
+
+  return (
+    <div className="builder">
+      <HoloFab />
+      <div className="builder-round-tag">FASE 3 · ROUND 1/2 — CONTRA-ATAQUE GUIADO</div>
+
       <div className="builder-step">
         <span className="builder-step-label">1 · ESCOLHA SUA POSTURA DE ATAQUE</span>
         <div className="posture-grid">
@@ -283,13 +280,8 @@ function Phase3Builder({ onPlay, disabled }) {
         </div>
       </div>
 
-      {/* Passo 2 — Andaime fixo + Passo 3 autoria */}
       {posture && (
-        <motion.div
-          className="builder-step"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div className="builder-step" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <span className="builder-step-label">
             <Terminal size={11} strokeWidth={2.5} /> 2 · FECHE O ARGUMENTO ({author.length}/{MAX_AUTHOR})
           </span>
@@ -305,13 +297,8 @@ function Phase3Builder({ onPlay, disabled }) {
             rows={2}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && ready) { e.preventDefault(); fire(); } }}
           />
-          <button
-            type="button"
-            className="builder-fire"
-            onClick={fire}
-            disabled={!ready || disabled}
-          >
-            <Send size={13} strokeWidth={2.5} /> DESFERIR GOLPE FINAL
+          <button type="button" className="builder-fire" onClick={fire} disabled={!ready || disabled}>
+            <Send size={13} strokeWidth={2.5} /> DESFERIR CONTRA-ATAQUE
           </button>
         </motion.div>
       )}
@@ -319,10 +306,57 @@ function Phase3Builder({ onPlay, disabled }) {
   );
 }
 
+// ── Round 2 da Fase 3 — Argumento livre (autoral, sem andaime) ───────────────
+function Phase3Free({ onPlay, disabled }) {
+  const [text, setText] = useState('');
+  const ready = text.trim().length >= 20;
+
+  const fire = () => {
+    if (!ready || disabled) return;
+    onPlay({ cardType: null, text: text.trim() });
+    setText('');
+  };
+
+  return (
+    <div className="builder">
+      <HoloFab />
+      <div className="builder-round-tag builder-round-final">FASE 3 · ROUND 2/2 — GOLPE FINAL AUTORAL</div>
+
+      <div className="builder-step">
+        <span className="builder-step-label">
+          <Terminal size={11} strokeWidth={2.5} /> ELABORE SEU ARGUMENTO COMPLETO ({text.length}/{MAX_FREE})
+        </span>
+        <p className="builder-free-hint">
+          Sem frases prontas agora. Construa o argumento inteiro (Alegação → Evidência → Conexão Lógica)
+          e finalize o MECHA-LOGIC. Consulte o Holo-Guia se precisar do esquema.
+        </p>
+        <textarea
+          className="author-input author-input-free"
+          value={text}
+          onChange={e => setText(e.target.value.slice(0, MAX_FREE))}
+          placeholder="Digite seu argumento completo e original para vencer o debate..."
+          disabled={disabled}
+          rows={4}
+          onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey && ready) { e.preventDefault(); fire(); } }}
+        />
+        <button type="button" className="builder-fire" onClick={fire} disabled={!ready || disabled}>
+          <Send size={13} strokeWidth={2.5} /> DESFERIR GOLPE FINAL
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Phase3Builder({ onPlay, disabled, round }) {
+  return round >= 2
+    ? <Phase3Free onPlay={onPlay} disabled={disabled} />
+    : <Phase3Postures onPlay={onPlay} disabled={disabled} />;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Componente principal
 // ════════════════════════════════════════════════════════════════════════════
-export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, correctFallacy, options }) {
+export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, correctFallacy, options, phase3Round }) {
   // Fase 1 — grid direto
   if (phase === 1) {
     if (!Array.isArray(fallacyOptions) || fallacyOptions.length === 0) return null;
@@ -347,9 +381,9 @@ export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, co
     return <Phase2Deck options={options} onPlay={onPlay} disabled={disabled} />;
   }
 
-  // Fase 3 — Construtor de Sentenças (renderizado pelo App via input-zone)
+  // Fase 3 — Construtor de Sentenças (round 1: posturas · round 2: texto livre)
   if (phase === 3) {
-    return <Phase3Builder onPlay={onPlay} disabled={disabled} />;
+    return <Phase3Builder onPlay={onPlay} disabled={disabled} round={phase3Round} />;
   }
 
   return null;

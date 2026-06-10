@@ -29,7 +29,7 @@ const PHASE_LABELS = { 1: 'FASE 1', 2: 'FASE 2', 3: 'BOSS FINAL' };
 const PHASE_MISSIONS = {
   1: 'Identifique a falácia no ataque do Boss clicando na opção correta.',
   2: 'Jogue uma carta e escolha, no Modal Flash, a réplica logicamente superior.',
-  3: 'Escolha uma postura de ataque e feche o argumento com sua autoria (≤140).',
+  3: 'Round 1: contra-ataque com uma postura guiada. Round 2: elabore o argumento final sozinho.',
 };
 
 const Particles = () => (
@@ -53,7 +53,7 @@ export default function App() {
     showPhaseIntro, pendingPhase,
     showReport, reportData,
     isGameOver, isVictory, gameEnded,
-    turnCount, totalTurns,
+    turnCount, totalTurns, phase3Round,
     pendingFallacy, dismissFallacy,
     theme, handleThemeSelect,
     handleAttack, handlePhaseIntroContinue, handleRestart: battleRestart,
@@ -275,12 +275,14 @@ export default function App() {
           <div className="input-zone">
             {!gameEnded && (
               <LogicCards
+                key={gamePhase === 3 ? `p3-r${phase3Round}` : `p${gamePhase}`}
                 onPlay={(play) => handleAttack(play)}
                 disabled={loading || bossAttacking || !!pendingFallacy}
                 phase={gamePhase}
                 fallacyOptions={bossAttack?.options}
                 correctFallacy={bossAttack?.fallacy}
                 options={bossAttack?.options}
+                phase3Round={phase3Round}
               />
             )}
 

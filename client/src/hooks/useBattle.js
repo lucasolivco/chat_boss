@@ -3,11 +3,13 @@ import { initPersonality, updatePersonality, generateReport } from '../lib/perso
 
 const API = '';
 
-// Sistema de turnos fixos: 3 por fase, 9 no total. HP é puramente cosmético.
-const TURNS_PER_PHASE = 3;
-const TOTAL_TURNS = 9;
-// Em qual turno (1-indexado) cada fase começa.
-const phaseForTurn = (turn) => Math.min(3, Math.floor((turn - 1) / TURNS_PER_PHASE) + 1);
+// Sistema de turnos fixos: Fase 1 (3) + Fase 2 (3) + Fase 3 (2) = 8 turnos.
+// HP é puramente cosmético — o fim é decidido pelo contador de turnos.
+const TOTAL_TURNS = 8;
+// Fase de cada turno (1-indexado): 1-3 → Fase 1, 4-6 → Fase 2, 7-8 → Fase 3.
+const phaseForTurn = (turn) => (turn <= 3 ? 1 : turn <= 6 ? 2 : 3);
+// Round dentro da Fase 3 (1 ou 2). turn 7 → round 1 (posturas), turn 8 → round 2 (texto livre).
+const phase3RoundForTurn = (turn) => Math.max(1, turn - 6);
 
 export function useBattle(user, screen) {
   const [bossHp, setBossHp]       = useState(100);
@@ -42,6 +44,9 @@ export function useBattle(user, screen) {
   const [reportData, setReportData]     = useState(null);
 
   const turnStartRef = useRef(Date.now());
+
+  // Round atual da Fase 3 (1 ou 2) para o PRÓXIMO turno a ser jogado.
+  const phase3Round = gamePhase === 3 ? phase3RoundForTurn(turnCount + 1) : 0;
 
   // Fim de jogo é DECIDIDO PELOS TURNOS, não pelo HP (que é cosmético).
   const gameEnded  = turnCount >= TOTAL_TURNS;
@@ -277,6 +282,7 @@ export function useBattle(user, screen) {
     showReport, reportData,
     isGameOver, isVictory, gameEnded,
     turnCount, totalTurns: TOTAL_TURNS,
+    phase3Round,
     pendingFallacy,
     theme,
     // Ações
