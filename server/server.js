@@ -68,20 +68,23 @@ async function callGeminiJSON(prompt, { maxTokens, temperature }) {
 // Gera JSON tentando os provedores em ordem rotativa; alterna em rate-limit.
 // Retorna { text, provider }. Lança o último erro se ambos falharem.
 async function generateLLMJson(prompt, { maxTokens = 4096, temperature = 0.8, timeout = 40000 } = {}) {
+  const start = llmCursor;       // base fixa do loop (NÃO mutar durante o for)
   let lastErr;
   for (let i = 0; i < LLM_PROVIDERS.length; i++) {
-    const provider = LLM_PROVIDERS[(llmCursor + i) % LLM_PROVIDERS.length];
+    const idx = (start + i) % LLM_PROVIDERS.length;
+    const provider = LLM_PROVIDERS[idx];
     if (provider === 'gemini' && !gemini) continue; // sem chave → pula
     try {
       const text = provider === 'groq'
         ? await callGroqJSON(prompt, { maxTokens, temperature, timeout })
         : await callGeminiJSON(prompt, { maxTokens, temperature });
+      llmCursor = idx;            // lembra o provedor que funcionou
       return { text, provider };
     } catch (err) {
       lastErr = err;
       if (isRateLimitError(err)) {
-        // Provedor no limite → fixa o cursor no PRÓXIMO para as chamadas seguintes.
-        llmCursor = (llmCursor + i + 1) % LLM_PROVIDERS.length;
+        // Provedor no limite → próximas chamadas já começam pelo outro.
+        llmCursor = (idx + 1) % LLM_PROVIDERS.length;
         console.warn(`[LLM] ${provider} no limite — alternando provedor.`);
         continue;
       }
@@ -912,9 +915,13 @@ app.post('/api/battle/generate-arena', async (req, res) => {
         });
         content = out.text; usedProvider = out.provider;
       } catch (e) {
-        // Ambos os provedores indisponíveis (cota dupla / erro de rede).
-        console.error(`Arena tentativa ${attempt}: nenhum provedor respondeu — ${e.message}`);
-        break;
+        // Erro transitório (ex: 503 "high demand" do Gemini, rede) OU cota dupla.
+        // NÃO desiste: usa as tentativas restantes com um pequeno backoff — picos
+        // de demanda costumam passar em segundos.
+        lastIssues = e.message;
+        console.error(`Arena tentativa ${attempt}: provedor indisponível — ${String(e.message).slice(0, 120)}`);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1200));
+        continue;
       }
 
       let raw;
