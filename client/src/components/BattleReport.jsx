@@ -10,8 +10,9 @@ const ARCHETYPE_ICONS = {
 };
 
 export default function BattleReport({ report, onClose, onRestart }) {
-  const { archetype, norm, avgWarrant, avgData, avgClaim, turns, critical_hits, weaknesses, fallacies, won, bossHp = 0, playerHp = 0 } = report;
+  const { archetype, norm, avgWarrant, avgData, avgClaim, turns, critical_hits, weaknesses, fallacies, won, bossHp = 0, score = 0, maxScore = 900, winScore = 500 } = report;
   const mechaQuote = won ? archetype.winQuote : archetype.lossQuote;
+  const scorePct = Math.min(100, Math.round((score / (maxScore || 900)) * 100));
 
   return (
     <div className="modal-overlay report-overlay">
@@ -25,22 +26,22 @@ export default function BattleReport({ report, onClose, onRestart }) {
             {won ? <Trophy size={36} strokeWidth={1.5} /> : <Skull size={36} strokeWidth={1.5} />}
           </div>
           <h2 className="hero-title">{won ? 'SUPREMACIA LÓGICA' : 'RESISTÊNCIA DA MÁQUINA'}</h2>
-          <p className="hero-sub">9 rodadas concluídas — {won ? 'você terminou com mais integridade que o MECHA-LOGIC.' : 'o MECHA-LOGIC resistiu com mais integridade que você.'}</p>
+          <p className="hero-sub">8 rodadas concluídas — você somou <strong>{score} pontos</strong> {won ? `e cravou a vitória (mín. ${winScore}).` : `(faltaram ${Math.max(0, winScore - score)} para vencer).`}</p>
         </div>
 
-        {/* Perfil de Combate — saldo final de HP (cosmético/performance) */}
+        {/* Perfil de Combate — dano causado ao boss + PONTUAÇÃO final */}
         <div className="combat-profile">
-          <span className="section-eyebrow"><Heart size={11} /> PERFIL DE COMBATE · SALDO FINAL</span>
+          <span className="section-eyebrow"><Heart size={11} /> PERFIL DE COMBATE · RESULTADO</span>
           <div className="combat-bars">
             <div className="combat-bar-row">
               <span className="combat-bar-name"><Cpu size={12} /> MECHA-LOGIC</span>
               <div className="combat-bar-track"><div className="combat-bar-fill combat-fill-boss" style={{ width: `${Math.max(0, bossHp)}%` }} /></div>
-              <span className="combat-bar-val">{Math.max(0, bossHp)}</span>
+              <span className="combat-bar-val">{Math.max(0, bossHp)} HP</span>
             </div>
             <div className="combat-bar-row">
               <span className="combat-bar-name"><Target size={12} /> VOCÊ</span>
-              <div className="combat-bar-track"><div className="combat-bar-fill combat-fill-player" style={{ width: `${Math.max(0, playerHp)}%` }} /></div>
-              <span className="combat-bar-val">{Math.max(0, playerHp)}</span>
+              <div className="combat-bar-track"><div className="combat-bar-fill combat-fill-player" style={{ width: `${scorePct}%` }} /></div>
+              <span className="combat-bar-val">{score} pts</span>
             </div>
           </div>
         </div>

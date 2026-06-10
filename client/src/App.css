@@ -786,6 +786,41 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .player-int-label { font-family: var(--font-alt); font-size: .7rem; color: var(--t-3); letter-spacing: .1em; text-transform: uppercase; }
 .player-int-val { font-family: var(--font-title); font-size: 1.15rem; font-weight: 700; transition: color .4s; }
 
+/* ── Pontuação (substitui a integridade/pips) ── */
+.player-score-label { font-family: var(--font-alt); font-size: .7rem; color: var(--t-3); letter-spacing: .1em; text-transform: uppercase; }
+.player-score-val {
+  position: relative;
+  font-family: var(--font-title); font-size: 1.35rem; font-weight: 800;
+  letter-spacing: .02em; transition: color .4s;
+  text-shadow: 0 0 12px rgba(0,212,255,.35);
+}
+.score-gain {
+  position: absolute; right: 0; top: -1.1em;
+  font-size: .8rem; font-weight: 800; color: var(--acid);
+  text-shadow: 0 0 10px rgba(200,255,0,.6);
+  animation: score-pop 1.5s var(--ease-out) forwards; pointer-events: none;
+}
+@keyframes score-pop {
+  0%   { opacity: 0; transform: translateY(6px) scale(.8); }
+  20%  { opacity: 1; transform: translateY(0) scale(1.1); }
+  70%  { opacity: 1; transform: translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateY(-16px) scale(.95); }
+}
+.score-track {
+  position: relative; width: 100%; height: 8px; border-radius: 4px;
+  background: rgba(255,255,255,.06); overflow: hidden;
+}
+.score-fill {
+  height: 100%; border-radius: 4px;
+  box-shadow: 0 0 10px -1px currentColor;
+  transition: width .5s var(--ease-out), background .4s;
+}
+.score-winmark {
+  position: absolute; top: 0; width: 2px; height: 100%;
+  background: rgba(200,255,0,.7); box-shadow: 0 0 6px var(--acid);
+  transform: translateX(-50%); z-index: 1;
+}
+
 .pip-row { display: flex; gap: 4px; }
 .pip { width: 24px; height: 9px; transform: skewX(-14deg); transition: all .3s var(--ease-out); }
 .pip-full {

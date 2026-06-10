@@ -11,9 +11,19 @@ const phaseForTurn = (turn) => (turn <= 3 ? 1 : turn <= 6 ? 2 : 3);
 // Round dentro da Fase 3 (1 ou 2). turn 7 → round 1 (posturas), turn 8 → round 2 (texto livre).
 const phase3RoundForTurn = (turn) => Math.max(1, turn - 6);
 
+// Pontuação: cada acerto rende pontos (a Fase 3 vale mais). Substitui a "integridade"
+// do jogador — em vez de PERDER vida ao errar, o jogador GANHA pontos ao acertar.
+const POINTS_BY_PHASE = { 1: 100, 2: 100, 3: 150 };
+// Máximo possível: 100×3 + 100×3 + 150×2 = 900. Vitória ≥ 500 (acertar a maioria).
+const MAX_SCORE = 900;
+const WIN_SCORE = 500;
+
 export function useBattle(user, screen) {
   const [bossHp, setBossHp]       = useState(100);
   const [playerHp, setPlayerHp]   = useState(100);
+  // Pontuação do jogador (substitui a integridade): sobe a cada acerto.
+  const [score, setScore]         = useState(0);
+  const [lastGain, setLastGain]   = useState(0); // último ganho, p/ o "+N" flutuante
   const [logs, setLogs]           = useState([]);
   const [loading, setLoading]     = useState(false);
   const [visualState, setVisualState] = useState('idle');
@@ -50,8 +60,8 @@ export function useBattle(user, screen) {
 
   // Fim de jogo é DECIDIDO PELOS TURNOS, não pelo HP (que é cosmético).
   const gameEnded  = turnCount >= TOTAL_TURNS;
-  // Vitória = saldo final de HP a favor do jogador (métrica de performance).
-  const isVictory  = gameEnded && bossHp < playerHp;
+  // Vitória = pontuação final atingiu o limiar (acertou a maioria das jogadas).
+  const isVictory  = gameEnded && score >= WIN_SCORE;
   const isGameOver = gameEnded && !isVictory;
 
   // ── Boss ataca primeiro ao entrar em cada fase ──────────────────────────────
@@ -87,17 +97,19 @@ export function useBattle(user, screen) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, gamePhase, theme]);
 
-  // ── Gera relatório ao fim dos 9 turnos ──────────────────────────────────────
+  // ── Gera relatório ao fim dos turnos ────────────────────────────────────────
   useEffect(() => {
     if (gameEnded && !showReport && !reportData) {
       const report = generateReport(personality, isVictory);
-      // Saldo final de HP entra como "Perfil de Combate" (métrica de performance).
+      // Perfil de Combate: HP do boss (dano causado) + PONTUAÇÃO do jogador.
       report.bossHp = bossHp;
-      report.playerHp = playerHp;
+      report.score = score;
+      report.maxScore = MAX_SCORE;
+      report.winScore = WIN_SCORE;
       setReportData(report);
       setTimeout(() => setShowReport(true), 1200);
     }
-  }, [gameEnded, showReport, reportData, personality, isVictory, bossHp, playerHp]);
+  }, [gameEnded, showReport, reportData, personality, isVictory, bossHp, score]);
 
   // ── Ataque do jogador ────────────────────────────────────────────────────────
   const handleAttack = useCallback(async (cardPlay = null, inputText = '') => {
@@ -136,6 +148,15 @@ export function useBattle(user, screen) {
 
       setBossHp(newBossHp);
       setPlayerHp(newPlayerHp);
+
+      // Pontuação: acerto (boss tomou dano) rende pontos da fase atual; erro = 0.
+      const scored = (data.boss_damage ?? 0) > 0;
+      const gained = scored ? (POINTS_BY_PHASE[gamePhase] ?? 0) : 0;
+      if (gained > 0) {
+        setScore(s => s + gained);
+        setLastGain(gained);
+        setTimeout(() => setLastGain(0), 1600);
+      }
 
       // Feedback visual do Boss
       if (data.boss_damage > 0) {
@@ -258,6 +279,8 @@ export function useBattle(user, screen) {
     }
     setBossHp(100);
     setPlayerHp(100);
+    setScore(0);
+    setLastGain(0);
     setLogs([]);
     setVisualState('idle');
     setPersonality(initPersonality());
@@ -283,6 +306,7 @@ export function useBattle(user, screen) {
     isGameOver, isVictory, gameEnded,
     turnCount, totalTurns: TOTAL_TURNS,
     phase3Round,
+    score, lastGain, winScore: WIN_SCORE, maxScore: MAX_SCORE,
     pendingFallacy,
     theme,
     // Ações

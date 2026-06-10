@@ -83,7 +83,7 @@ Fase:      1   │   2   │  3
     ├── Turnos 4-6 · Fase 2: Modal Flash (3 réplicas, determinístico)
     ├── Turnos 7-8 · Fase 3: round 1 (postura) + round 2 (texto livre) (Groq + Toulmin)
     │
-    └── turnCount === 8 → [BattleReport] (saldo de HP = Perfil de Combate)
+    └── turnCount === 8 → [BattleReport] (PONTUAÇÃO ≥ 500 = vitória)
 ```
 
 > **Sem manual (HowToPlay).** Aprendizado orgânico via feedbacks curtos das cartas.
@@ -406,16 +406,19 @@ CB/
 
 ```javascript
 // Estados gerenciados pelo hook (fora do App.jsx):
-// - bossHp, playerHp        (COSMÉTICOS — alimentam efeitos visuais)
-// - turnCount (0..9)        (MÁQUINA DE ESTADOS — define fase e fim)
+// - bossHp                  (COSMÉTICO — barra do inimigo; 0 só em run perfeito)
+// - score, lastGain         (PONTUAÇÃO do jogador — sobe a cada acerto; substitui a integridade)
+// - turnCount (0..8)        (MÁQUINA DE ESTADOS — define fase e fim)
 // - logs (histórico de turnos do chat)
 // - gamePhase (1 | 2 | 3)   (derivado por phaseForTurn)
 // - bossAttack, bossAttacking, screenShake
 // - showPhaseIntro, pendingPhase, phaseTransitioning
-// - loading, isGameOver, isVictory (= bossHp < playerHp no fim)
+// - loading, isGameOver, isVictory (= score >= 500 no fim)
+//
+// Pontuação: acerto rende pontos por fase (F1 100, F2 100, F3 150); máx 900, vitória ≥ 500.
 //
 // Funções exportadas:
-// - handleAttack(cardPlay)  // consome 1 turno; no 9º → BattleReport
+// - handleAttack(cardPlay)  // consome 1 turno; no 8º → BattleReport
 // - handlePhaseIntroContinue()
 // - handleRestart()
 // - handleThemeSelect(theme)

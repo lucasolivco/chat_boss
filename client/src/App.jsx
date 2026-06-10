@@ -48,12 +48,13 @@ export default function App() {
 
   // ── Lógica de combate delegada ao hook ───────────────────────────────────────
   const {
-    bossHp, playerHp, logs, loading, visualState, screenShake,
+    bossHp, logs, loading, visualState, screenShake,
     gamePhase, bossAttack, bossAttacking,
     showPhaseIntro, pendingPhase,
     showReport, reportData,
     isGameOver, isVictory, gameEnded,
     turnCount, totalTurns, phase3Round,
+    score, lastGain, winScore, maxScore,
     pendingFallacy, dismissFallacy,
     theme, handleThemeSelect,
     handleAttack, handlePhaseIntroContinue, handleRestart: battleRestart,
@@ -94,14 +95,12 @@ export default function App() {
     attack: { label: 'CONTRA-ATAQUE',   icon: Swords },
     dead:   { label: 'SISTEMA OFFLINE', icon: ShieldCheck },
   };
-  const playerPips = useMemo(
-    () => Array.from({ length: 10 }, (_, i) => i < Math.ceil(playerHp / 10)),
-    [playerHp]
+  // Progresso da pontuação rumo à vitória (substitui a barra de integridade).
+  const scorePct = useMemo(
+    () => Math.min(100, Math.round((score / (maxScore || 900)) * 100)),
+    [score, maxScore]
   );
-  const pipColor = useMemo(
-    () => playerHp > 50 ? 'var(--ice)' : playerHp > 25 ? '#ff9900' : 'var(--crimson)',
-    [playerHp]
-  );
+  const scoreColor = score >= winScore ? 'var(--acid)' : score > 0 ? 'var(--ice)' : 'var(--t-3)';
   const bossStatus = bossStatusMap[visualState] || bossStatusMap.idle;
   const StatusIcon = bossStatus.icon;
 
@@ -209,15 +208,16 @@ export default function App() {
                 <span className="player-name">{user?.username ?? 'VISITANTE'}</span>
               </div>
               <div className="player-right">
-                <span className="player-int-label">INTEGRIDADE</span>
-                <span className="player-int-val" style={{ color: pipColor }}>{playerHp}%</span>
+                <span className="player-score-label">PONTOS</span>
+                <span className="player-score-val" style={{ color: scoreColor }}>
+                  {score}
+                  {lastGain > 0 && <span key={score} className="score-gain">+{lastGain}</span>}
+                </span>
               </div>
             </div>
-            <div className="pip-row">
-              {playerPips.map((full, i) => (
-                <div key={i} className={`pip ${full ? 'pip-full' : 'pip-empty'}`}
-                     style={full ? { '--pip-color': pipColor } : {}} />
-              ))}
+            <div className="score-track" title={`Vitória a partir de ${winScore} pts`}>
+              <div className="score-fill" style={{ width: `${scorePct}%`, background: scoreColor }} />
+              <div className="score-winmark" style={{ left: `${Math.round((winScore / (maxScore || 900)) * 100)}%` }} />
             </div>
           </div>
 
@@ -266,8 +266,8 @@ export default function App() {
               </div>
             )}
 
-            {isVictory  && <div className="end-banner victory-banner"><TrophyIcon size={18} strokeWidth={1.8} /> VITÓRIA LÓGICA — MECHA-LOGIC foi derrotado</div>}
-            {isGameOver && <div className="end-banner defeat-banner"><HeartCrack size={18} strokeWidth={1.8} /> GAME OVER — Sua lógica falhou</div>}
+            {isVictory  && <div className="end-banner victory-banner"><TrophyIcon size={18} strokeWidth={1.8} /> VITÓRIA LÓGICA — {score} pontos</div>}
+            {isGameOver && <div className="end-banner defeat-banner"><HeartCrack size={18} strokeWidth={1.8} /> FIM — {score} pontos (mín. {winScore} p/ vencer)</div>}
             <div ref={chatEndRef} />
           </div>
 
