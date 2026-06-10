@@ -29,7 +29,7 @@ const PHASE_LABELS = { 1: 'FASE 1', 2: 'FASE 2', 3: 'BOSS FINAL' };
 const PHASE_MISSIONS = {
   1: 'Identifique a falácia no ataque do Boss clicando na opção correta.',
   2: 'Jogue uma carta e escolha, no Modal Flash, a réplica logicamente superior.',
-  3: 'Selecione 2 vetores de ataque e feche o argumento com sua autoria (≤140).',
+  3: 'Escolha uma postura de ataque e feche o argumento com sua autoria (≤140).',
 };
 
 const Particles = () => (
@@ -114,9 +114,9 @@ export default function App() {
     <AuthModal onLogin={handleLogin} />
   );
 
-  // Seleção de tema — aparece após login, antes da arena
+  // Seleção de tema (texto livre) + geração da arena — após login, antes da arena
   if (screen === 'game' && !theme) return (
-    <ThemeSelection onSelect={handleThemeSelect} />
+    <ThemeSelection user={user} onSelect={handleThemeSelect} />
   );
 
   // ── Game Arena ───────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ export default function App() {
         />
       )}
       {showPhaseIntro && pendingPhase && (
-        <PhaseIntro phase={pendingPhase} onContinue={handlePhaseIntroContinue} theme={theme} />
+        <PhaseIntro phase={pendingPhase} onContinue={handlePhaseIntroContinue} />
       )}
       {pendingFallacy && (
         <FallacyCard data={pendingFallacy} onClose={dismissFallacy} />
@@ -281,7 +281,6 @@ export default function App() {
                 fallacyOptions={bossAttack?.options}
                 correctFallacy={bossAttack?.fallacy}
                 options={bossAttack?.options}
-                themeId={theme?.id}
               />
             )}
 

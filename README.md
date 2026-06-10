@@ -71,12 +71,11 @@ Fase:      1   │   2   │   3
 [AuthModal] — apelido apenas, sem senha
     │
     ▼
-[ThemeSelection] — escolha do tema de debate
-    │  ├── Impacto das Redes Sociais na Saúde Mental
-    │  ├── Mudanças Climáticas e Transição Energética
-    │  └── O Futuro do Trabalho e a Automação por IA
+[ThemeSelection] — tema de TEXTO LIVRE (ex: Pokémon, Futebol, Cinema)
+    │  └── "GERAR ARENA DE DUELO" → POST /api/battle/generate-arena
+    │        (1 chamada Groq gera os 9 turnos; tela de geração imersiva)
     ▼
-[Game Arena — 9 turnos fixos]
+[Game Arena — 9 turnos fixos servidos da arena pré-gerada]
     │
     ├── Turnos 1-3 · Fase 1: grid de falácias (determinístico)
     ├── Turnos 4-6 · Fase 2: Modal Flash (3 réplicas, determinístico)
@@ -358,7 +357,7 @@ CB/
 │       ├── components/
 │       │   ├── IntroScreen.jsx         # Tela inicial (typewriter)
 │       │   ├── AuthModal.jsx           # Entrada por apelido (sem senha)
-│       │   ├── ThemeSelection.jsx      # Escolha do tema de debate (3 opções)
+│       │   ├── ThemeSelection.jsx      # Tema de texto livre + geração imersiva da arena
 │       │   ├── LogicCards.jsx          # F1 grid · F2 Modal Flash · F3 Construtor de Sentenças
 │       │   ├── PhaseIntro.jsx          # Transição (sem timer) + Holo-Guia de Toulmin (Fase 3)
 │       │   ├── FallacyCard.jsx         # Ficha de Falácia: modal animado pós-turno
@@ -413,7 +412,8 @@ CB/
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/battle/boss-attack?phase=N&theme=TEMA` | Ataque de abertura do Boss — temático por fase |
+| POST | `/api/battle/generate-arena` | **Pre-Generation Hack** — recebe `{ theme_text, user_id }`, gera os 9 turnos via Groq e grava em `user_stats.arena_data` |
+| GET | `/api/battle/boss-attack?phase=N&turn=T&theme=TEMA` | Serve o ataque pré-gerado por índice (`turn % 3`), <20ms |
 | POST | `/api/battle` | Turno de batalha — avalia argumento, atualiza HP no banco, retorna resultado |
 | POST | `/api/session/reset` | Zera `current_boss_hp`/`current_player_hp` ao iniciar novo duelo |
 | GET | `/api/user/:id/stats` | Stats e título do usuário |
@@ -439,7 +439,8 @@ Body:
   selected_logic     string | null  — falácia escolhida (Fase 1)
   correct_fallacy    string | null  — gabarito do ataque (Fase 1 — validação determinística)
   selected_option_id string | null  — opção clicada no Modal Flash (Fase 2 — determinística)
-  theme_id           "redes_sociais" | "clima" | "automacao" | null
+  theme_id           string | null  — texto livre do tema (ex: "Pokémon")
+  theme_text         string | null  — texto livre do tema (label nos prompts da Fase 3)
   responseTimeMs     int | null
 
 Fluxo no servidor:
@@ -450,18 +451,17 @@ Fluxo no servidor:
   3. [FASE 2] Se selected_option_id fornecido → determinística (sem Groq):
      - lê user_stats.current_expected_option (gabarito gravado pelo boss-attack)
      - acerto → aplica boss_damage/feedback da opção; erro → player_damage=15  → retorna (~20ms)
-  4. [FASE 3] Seleciona buildPhasePrompts(themeLabel)[3] (texto unificado: andaime + autoria)
+  4. [FASE 3] buildPhasePrompts(themeLabel)[3] como system prompt (texto unificado: postura + autoria);
+     injeta arena_data.phase3_context no prompt para julgar dentro do tema customizado
   5. Chama Groq (LLaMA 3.3-70b) → JSON validado por Zod
   6. Se play_valid === false → força boss_damage=0, player_damage=25
   7. Lê current_boss_hp e current_player_hp do banco (user_stats)
-  8. Aplica o dano: new_boss_hp = current - boss_damage
-                    new_player_hp = current - player_damage
-  9. Persiste os novos HPs em user_stats
- 10. Se new_boss_hp <= 0  → won_battle = true  em battles + user_stats
-     Se new_player_hp <= 0 → won_battle = false em battles + user_stats
+  8. Aplica o dano (clamp em 0): new_boss_hp = max(0, current - boss_damage), idem player
+  9. Persiste os novos HPs em user_stats (HP é COSMÉTICO — não encerra o jogo)
+ 10. won_battle = PLACAR do turno (boss_hp < player_hp). NÃO há fim por HP=0
  11. INSERT em battles (16 campos)
  12. UPDATE user_stats + calcTitle
- 13. Retorna gameData (inclui won/lost se aplicável)
+ 13. Retorna gameData com boss_hp/player_hp (SEM won/lost — fim é decidido pelos 9 turnos no front)
 ```
 
 > **`won_battle` nunca vem do frontend.** O campo só é escrito pelo backend.
@@ -609,6 +609,8 @@ CREATE TABLE user_stats (
   current_boss_hp   INT DEFAULT 100,         -- HP persistido no servidor
   current_player_hp INT DEFAULT 100,         -- HP persistido no servidor
   current_expected_option JSONB,             -- gabarito da opção correta da Fase 2 (Modal Flash)
+  arena_data        JSONB,                   -- Pre-Generation Hack: 9 turnos gerados pela IA (tema livre)
+  arena_theme       TEXT,                    -- texto do tema digitado pelo jogador
   title             VARCHAR(100) DEFAULT 'Iniciante Lógico',
   updated_at        TIMESTAMP DEFAULT NOW()
 );

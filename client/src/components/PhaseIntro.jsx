@@ -47,15 +47,16 @@ export function ToulminBlock({ part, text }) {
 }
 
 // Painel completo do Esquema de Injeção Lógica — exportado p/ reuso na arena.
-export function HoloGuide({ themeId, compact = false }) {
-  const ex = getToulminExample(themeId);
-  const exampleLabel = getExampleThemeLabel(themeId);
+export function HoloGuide({ compact = false }) {
+  // Exemplo UNIVERSAL e fixo (independe do tema escolhido pelo jogador).
+  const ex = getToulminExample();
+  const exampleLabel = getExampleThemeLabel();
   return (
     <div className={`holo-guide ${compact ? 'holo-guide-compact' : ''}`}>
-      {/* Blindagem visual: deixa explícito que é só um exemplo didático */}
+      {/* Blindagem visual: deixa explícito que é um MODELO ABSTRATO universal */}
       <div className="holo-warning-badge">
         <AlertTriangle size={11} strokeWidth={2.5} />
-        MAPA CONCEITUAL: APENAS EXEMPLO DIDÁTICO INTERNACIONAL
+        MODELO ESTRUTURAL ABSTRATO · APENAS EXEMPLO
       </div>
       <div className="holo-guide-head">
         <Eye size={14} strokeWidth={2} />
@@ -65,9 +66,9 @@ export function HoloGuide({ themeId, compact = false }) {
       <ToulminBlock part="data"    text={ex.data} />
       <ToulminBlock part="warrant" text={ex.warrant} />
       <p className="holo-warning-note">
-        Este argumento sobre <strong>{exampleLabel}</strong> serve apenas para demonstrar a estrutura
-        de Stephen Toulmin. <strong>Não tente utilizá-lo contra o debate atual do MECHA-LOGIC.</strong>
-        Crie sua própria lógica baseada no método demonstrado.
+        Este exemplo sobre <strong>{exampleLabel}</strong> é um <strong>modelo universal</strong> —
+        serve só para você espelhar a ESTRUTURA lógica de Toulmin. Ele <strong>não tem relação com o
+        tema que você escolheu</strong>: adapte o raciocínio ao SEU debate.
       </p>
       <p className="holo-guide-foot">
         Um argumento sólido encadeia <strong>Alegação → Evidência → Conexão Lógica</strong>.
@@ -77,7 +78,7 @@ export function HoloGuide({ themeId, compact = false }) {
   );
 }
 
-export default function PhaseIntro({ phase, onContinue, theme }) {
+export default function PhaseIntro({ phase, onContinue }) {
   const isFinal = phase === 3;
   // NENHUMA fase auto-avança: a tela espera o jogador clicar para continuar.
   const data = PHASE_DATA[phase] || PHASE_DATA[1];
@@ -94,8 +95,8 @@ export default function PhaseIntro({ phase, onContinue, theme }) {
         <h2 className="phase-intro-name">{data.name}</h2>
         <p className="phase-intro-desc">{data.desc}</p>
 
-        {/* Holo-Guia: exemplo trabalhado de Toulmin, só na Fase 3 */}
-        {isFinal && <HoloGuide themeId={theme?.id} />}
+        {/* Holo-Guia: exemplo UNIVERSAL trabalhado de Toulmin, só na Fase 3 */}
+        {isFinal && <HoloGuide />}
 
         {!isFinal && <p className="phase-intro-hint">{data.hint}</p>}
 

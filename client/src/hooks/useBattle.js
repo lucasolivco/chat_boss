@@ -50,13 +50,14 @@ export function useBattle(user, screen) {
   const isGameOver = gameEnded && !isVictory;
 
   // ── Boss ataca primeiro ao entrar em cada fase ──────────────────────────────
-  const fetchBossAttack = useCallback(async (phase, currentTheme) => {
+  // `turn` (0..8) define qual dos 3 ataques pré-gerados da fase será servido (idx = turn % 3).
+  const fetchBossAttack = useCallback(async (phase, currentTheme, turn = 0) => {
     setBossAttacking(true);
     setBossAttack(null);
     try {
       const themeId = currentTheme?.id ?? '';
       const uid = user?.user_id ? `&user_id=${user.user_id}` : '';
-      const r = await fetch(`${API}/api/battle/boss-attack?phase=${phase}&theme=${encodeURIComponent(themeId)}${uid}`);
+      const r = await fetch(`${API}/api/battle/boss-attack?phase=${phase}&theme=${encodeURIComponent(themeId)}&turn=${turn}${uid}`);
       const data = await r.json();
       setBossAttack(data);
       setLogs(p => [...p, {
@@ -72,10 +73,11 @@ export function useBattle(user, screen) {
     }
   }, [user]);
 
-  // Dispara ataque do boss quando entra no jogo ou muda de fase
+  // Dispara ataque do boss quando entra no jogo ou muda de fase.
+  // turnCount no momento da entrada da fase já está no início dela (idx = turnCount % 3 = 0).
   useEffect(() => {
     if (screen === 'game' && theme && !phaseTransitioning) {
-      fetchBossAttack(gamePhase, theme);
+      fetchBossAttack(gamePhase, theme, turnCount);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, gamePhase, theme]);
@@ -118,6 +120,7 @@ export function useBattle(user, screen) {
           responseTimeMs,
           game_phase:      gamePhase,
           theme_id:        theme?.id ?? null,
+          theme_text:      theme?.label ?? null,
         }),
       });
       const data = await res.json();
@@ -177,8 +180,9 @@ export function useBattle(user, screen) {
           setPhaseTransitioning(true);
           setPendingPhase(nextPhase);
           setTimeout(() => setShowPhaseIntro(true), 600);
-        } else if (curPhase === 1) {
-          setTimeout(() => fetchBossAttack(1, theme), 200);
+        } else if (curPhase === 1 || curPhase === 2) {
+          // Fases 1 e 2 servem um novo ataque pré-gerado por turno (idx = newTurn % 3).
+          setTimeout(() => fetchBossAttack(curPhase, theme, newTurn), 200);
         } else {
           turnStartRef.current = Date.now();
         }

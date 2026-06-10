@@ -207,7 +207,7 @@ const POSTURES = [
   },
 ];
 
-function Phase3Builder({ themeId, onPlay, disabled }) {
+function Phase3Builder({ onPlay, disabled }) {
   const [posture, setPosture] = useState(null);     // postura única selecionada
   const [author, setAuthor]   = useState('');       // desfecho autoral (≤140)
   const [guideOpen, setGuideOpen] = useState(false);
@@ -253,7 +253,7 @@ function Phase3Builder({ themeId, onPlay, disabled }) {
               <span><Eye size={14} /> HOLO-GUIA TÁTICO</span>
               <button className="flash-close" onClick={() => setGuideOpen(false)} aria-label="Fechar"><X size={16} /></button>
             </div>
-            <HoloGuide themeId={themeId} compact />
+            <HoloGuide compact />
           </motion.aside>
         )}
       </AnimatePresence>
@@ -322,7 +322,7 @@ function Phase3Builder({ themeId, onPlay, disabled }) {
 // ════════════════════════════════════════════════════════════════════════════
 // Componente principal
 // ════════════════════════════════════════════════════════════════════════════
-export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, correctFallacy, options, themeId }) {
+export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, correctFallacy, options }) {
   // Fase 1 — grid direto
   if (phase === 1) {
     if (!Array.isArray(fallacyOptions) || fallacyOptions.length === 0) return null;
@@ -349,7 +349,7 @@ export default function LogicCards({ onPlay, disabled, phase, fallacyOptions, co
 
   // Fase 3 — Construtor de Sentenças (renderizado pelo App via input-zone)
   if (phase === 3) {
-    return <Phase3Builder themeId={themeId} onPlay={onPlay} disabled={disabled} />;
+    return <Phase3Builder onPlay={onPlay} disabled={disabled} />;
   }
 
   return null;

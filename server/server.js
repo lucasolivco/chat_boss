@@ -36,6 +36,39 @@ const battleSchema = z.object({
   play_valid: z.boolean().nullable().default(null),
 });
 
+// ─── Catálogo canônico de falácias (pt-br) ────────────────────────────────────
+// O gerador de arena DEVE usar exatamente estes nomes (Fase 1 determinística).
+const FALLACY_NAMES = [
+  'Ataque Pessoal', 'Espantalho', 'Apelo à Autoridade Indevida', 'Bola de Neve',
+  'Falsa Dicotomia', 'Raciocínio Circular', 'Generalização Apressada',
+  'Apelo à Emoção', 'Causa Falsa',
+];
+
+// ─── Validação da ARENA gerada por IA (Pre-Generation Hack) ───────────────────
+// Estrutura completa dos 9 turnos produzida numa única chamada ao Groq.
+const arenaOptionSchema = z.object({
+  card_type_bound: z.enum(['fallacy', 'data', 'counter']),
+  text_content:    z.string().min(1),
+  is_correct:      z.boolean(),
+  boss_damage:     z.number().int().min(0).max(30),
+  player_damage:   z.number().int().min(0).max(25),
+  feedback_text:   z.string().min(1),
+});
+
+const arenaSchema = z.object({
+  phase1: z.array(z.object({
+    text:    z.string().min(1),
+    fallacy: z.string().min(1),
+    options: z.array(z.string().min(1)).min(3).max(6),
+  })).length(3),
+  phase2: z.array(z.object({
+    text:         z.string().min(1),
+    boss_fallacy: z.string().min(1),
+    options:      z.array(arenaOptionSchema).length(3),
+  })).length(3),
+  phase3_context: z.string().min(1),
+});
+
 // ─── Validação do PAYLOAD DE ENTRADA do jogador (Zod) ─────────────────────────
 // Valida o body de POST /api/battle antes de montar o prompt de julgamento.
 // A mecânica híbrida da Fase 2 exige selected_logic/selected_target quando há carta.
@@ -50,7 +83,9 @@ const battleRequestSchema = z.object({
   // Fase 2 (Modal Flash): id da alternativa que o jogador clicou.
   selected_option_id: z.string().nullable().optional(),
   responseTimeMs:  z.number().int().nonnegative().nullable().optional(),
-  theme_id:        z.enum(['redes_sociais', 'clima', 'automacao']).nullable().optional(),
+  // Tema agora é TEXTO LIVRE digitado pelo jogador (ex: "Pokémon", "Futebol").
+  theme_id:        z.string().max(120).nullable().optional(),
+  theme_text:      z.string().max(120).nullable().optional(),
 }).superRefine((data, ctx) => {
   // Fluxo novo (Modal Flash): se o jogador enviou selected_option_id, a validação
   // determinística da Fase 2 cuida de tudo — não exige selected_logic/target.
@@ -528,18 +563,204 @@ app.post('/api/quiz/submit', async (req, res) => {
   }
 });
 
+// ─── Pre-Generation Hack: gera a arena completa de 9 turnos sob o tema livre ───
+// Uma ÚNICA chamada ao Groq monta as Fases 1, 2 e 3. O resultado é validado,
+// reparado (invariantes de jogo) e persistido em user_stats.arena_data.
+
+function buildArenaPrompt(themeText) {
+  return `Você é o GERADOR DE ARENA do ChatBoss — um jogo de combate argumentativo onde o jogador debate contra a IA MECHA-LOGIC. Sua tarefa é montar a estrutura COMPLETA de um duelo de 9 turnos (3 fases) baseado EXCLUSIVAMENTE no tema fornecido pelo jogador.
+
+TEMA ESCOLHIDO PELO JOGADOR: "${themeText}"
+
+Todos os ataques, falácias e argumentos devem girar em torno desse tema de forma criativa, divertida e pedagogicamente válida. Adapte o rigor: se o tema for leve (ex: Pokémon, Futebol), use exemplos do universo do tema mas mantenha as falácias logicamente corretas.
+
+CATÁLOGO OBRIGATÓRIO DE FALÁCIAS (use SOMENTE estes nomes, em pt-br, exatamente assim):
+${FALLACY_NAMES.map(f => `- ${f}`).join('\n')}
+
+ESTRUTURA A GERAR:
+
+▸ FASE 1 — "phase1": array de EXATAMENTE 3 objetos. Cada objeto:
+  - "text": uma afirmação ARROGANTE e curta do MECHA-LOGIC sobre o tema que comete EXATAMENTE UMA falácia (2-3 frases).
+  - "fallacy": o nome EXATO (do catálogo) da falácia cometida nesse texto.
+  - "options": array de EXATAMENTE 4 nomes de falácias do catálogo — DEVE incluir o valor de "fallacy" e mais 3 distratores plausíveis. Embaralhe a ordem.
+  As 3 falácias corretas das 3 rodadas devem ser DIFERENTES entre si.
+
+▸ FASE 2 — "phase2": array de EXATAMENTE 3 objetos. Cada objeto:
+  - "text": um argumento COMPLEXO e capcioso do MECHA-LOGIC sobre o tema (2-4 frases) que comete uma falácia mais sutil.
+  - "boss_fallacy": o nome EXATO (do catálogo) da falácia cometida.
+  - "options": array de EXATAMENTE 3 réplicas possíveis do jogador. Cada réplica:
+      • "card_type_bound": "fallacy" (aponta a falácia), "data" (exige dados/fonte) ou "counter" (contra-argumenta).
+      • "text_content": a frase curta da réplica (1-2 frases).
+      • "is_correct": true para EXATAMENTE UMA das 3 (a réplica logicamente superior que desmonta o argumento sem cometer nova falácia); false para as outras 2 (distratores plausíveis que cometem erro lógico ou são fracos).
+      • "boss_damage": se correta, 20-25; se incorreta, 0.
+      • "player_damage": se correta, 0; se incorreta, 12-18.
+      • "feedback_text": explicação pedagógica curta (1 frase) do porquê acertou/errou.
+
+▸ FASE 3 — "phase3_context": uma string (3-5 frases) com um desafio FILOSÓFICO e socrático do Boss Final sobre o tema, provocando o jogador a construir um argumento autoral. Tom arrogante, vocabulário elevado, mas ancorado no tema.
+
+Retorne APENAS este JSON válido (sem markdown, sem comentários):
+{
+  "phase1": [ { "text": "...", "fallacy": "...", "options": ["...","...","...","..."] } ],
+  "phase2": [ { "text": "...", "boss_fallacy": "...", "options": [ { "card_type_bound": "...", "text_content": "...", "is_correct": true, "boss_damage": 22, "player_damage": 0, "feedback_text": "..." } ] } ],
+  "phase3_context": "..."
+}`;
+}
+
+// Repara invariantes que o LLM às vezes viola — garante mecânica de jogo consistente.
+function repairArena(arena) {
+  // Fase 1: garante que options contenha a falácia correta e tenha 4 itens.
+  arena.phase1 = arena.phase1.map(a => {
+    let opts = Array.from(new Set(a.options.filter(Boolean)));
+    if (!opts.some(o => o.toLowerCase() === a.fallacy.toLowerCase())) opts.unshift(a.fallacy);
+    // Completa com distratores do catálogo se faltar; corta em 4.
+    for (const f of FALLACY_NAMES) { if (opts.length >= 4) break; if (!opts.includes(f)) opts.push(f); }
+    opts = opts.slice(0, 4).sort(() => Math.random() - 0.5);
+    return { ...a, options: opts };
+  });
+
+  // Fase 2: força EXATAMENTE uma opção correta + normaliza danos (determinismo seguro).
+  arena.phase2 = arena.phase2.map(a => {
+    const opts = a.options.map(o => ({ ...o }));
+    let correct = opts.filter(o => o.is_correct);
+    if (correct.length !== 1) {
+      // Elege a de maior boss_damage como correta; zera as demais.
+      const best = opts.reduce((m, o) => (o.boss_damage > (m?.boss_damage ?? -1) ? o : m), null) || opts[0];
+      opts.forEach(o => { o.is_correct = (o === best); });
+    }
+    opts.forEach(o => {
+      if (o.is_correct) {
+        o.boss_damage   = Math.min(25, Math.max(20, o.boss_damage || 22));
+        o.player_damage = 0;
+      } else {
+        o.boss_damage   = 0;
+        o.player_damage = Math.min(18, Math.max(12, o.player_damage || 15));
+      }
+    });
+    return { ...a, options: opts };
+  });
+
+  return arena;
+}
+
+app.post('/api/battle/generate-arena', async (req, res) => {
+  const themeText = String(req.body?.theme_text ?? '').trim().slice(0, 120);
+  const userId    = parseInt(req.body?.user_id) || null;
+
+  if (themeText.length < 2) {
+    return res.status(400).json({ error: 'Tema muito curto. Digite ao menos 2 caracteres.' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'user_id obrigatório para gerar a arena.' });
+  }
+  if (isBlocked(themeText)) {
+    return res.status(400).json({ error: 'Tema bloqueado pelas diretrizes de conteúdo.' });
+  }
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: buildArenaPrompt(themeText) }],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.85,
+      max_tokens: 4096,
+      response_format: { type: 'json_object' },
+    }, { timeout: 30000 });
+
+    const raw = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    const parsed = arenaSchema.safeParse(raw);
+    if (!parsed.success) {
+      console.error('Arena fora do schema:', parsed.error.issues.slice(0, 5));
+      return res.status(502).json({ error: 'A IA gerou uma arena inválida. Tente outro tema ou tente novamente.' });
+    }
+
+    const arena = repairArena(parsed.data);
+
+    // Persiste a arena + reseta HP e gabarito para um duelo limpo.
+    await pool.query(
+      `UPDATE user_stats
+         SET arena_data = $1, arena_theme = $2,
+             current_expected_option = NULL,
+             current_boss_hp = 100, current_player_hp = 100
+       WHERE user_id = $3`,
+      [JSON.stringify(arena), themeText, userId]
+    );
+
+    // Libera o jogo: o cliente só precisa saber que a arena está pronta.
+    res.json({ ok: true, theme: themeText, turns: 9 });
+  } catch (error) {
+    console.error('Erro ao gerar arena:', error);
+    res.status(500).json({ error: 'Falha na geração da arena. Verifique a conexão e tente novamente.' });
+  }
+});
+
 // ─── Boss Attack endpoint (loop invertido — Boss ataca primeiro) ──────────────
+// Agora SERVE a arena pré-gerada (arena_data) por índice de turno → latência <20ms.
 // Fase 1: devolve as opções de falácia + o gabarito `fallacy` (validação determinística no front→back).
 // Fase 2: Modal Flash. Devolve 3 opções SEM is_correct/dano/feedback (integridade acadêmica);
 //         o gabarito da opção correta é gravado em user_stats.current_expected_option no servidor.
-// Fase 3: só o texto do ataque (a réplica é avaliada por Groq sobre o texto unificado).
+// Fase 3: o contexto socrático gerado para o tema (a réplica é avaliada por Groq ao vivo).
 app.get('/api/battle/boss-attack', async (req, res) => {
   const phase   = parseInt(req.query.phase) || 1;
   const themeId = req.query.theme || '';
   const userId  = parseInt(req.query.user_id) || null;
+  const turn    = parseInt(req.query.turn) || 0;
+  const idx     = ((turn % 3) + 3) % 3; // índice 0..2 do ataque dentro da fase
+
+  // Carrega a arena pré-gerada do jogador (fonte primária).
+  let arena = null;
+  if (userId) {
+    try {
+      const r = await pool.query('SELECT arena_data FROM user_stats WHERE user_id = $1', [userId]);
+      arena = r.rows[0]?.arena_data ?? null;
+    } catch (e) {
+      console.error('Erro ao ler arena_data:', e);
+    }
+  }
+
+  if (arena) {
+    // FASE 1 — ataque indexado + gabarito de falácia.
+    if (phase === 1) {
+      const a = arena.phase1?.[idx] || arena.phase1?.[0];
+      if (a) return res.json({ text: a.text, fallacy: a.fallacy, options: a.options, phase, theme: themeId });
+    }
+
+    // FASE 2 — Modal Flash a partir da arena: embaralha, oculta gabarito, persiste correto.
+    if (phase === 2) {
+      const a = arena.phase2?.[idx] || arena.phase2?.[0];
+      if (a && Array.isArray(a.options)) {
+        const withIds  = a.options.map((o, i) => ({ ...o, option_id: `opt_${i}` }));
+        const shuffled = [...withIds].sort(() => Math.random() - 0.5);
+        const correct  = { ...withIds.find(o => o.is_correct), boss_fallacy: a.boss_fallacy ?? null };
+
+        if (userId && correct) {
+          try {
+            await pool.query(
+              'UPDATE user_stats SET current_expected_option = $1 WHERE user_id = $2',
+              [JSON.stringify(correct), userId]
+            );
+          } catch (e) {
+            console.error('Erro ao salvar current_expected_option:', e);
+          }
+        }
+
+        const publicOptions = shuffled.map(o => ({
+          option_id: o.option_id,
+          card_type_bound: o.card_type_bound,
+          text_content: o.text_content,
+        }));
+        return res.json({ text: a.text, phase, theme: themeId, options: publicOptions });
+      }
+    }
+
+    // FASE 3 — contexto socrático gerado para o tema.
+    if (phase === 3 && arena.phase3_context) {
+      return res.json({ text: arena.phase3_context, phase, theme: themeId });
+    }
+  }
+
+  // ── Fallback (arena ausente): conteúdo estático legado ─────────────────────
   const themeMap = THEME_ATTACKS[themeId] || DEFAULT_ATTACKS;
   const attacks  = themeMap[phase] || themeMap[1] || DEFAULT_ATTACKS[1];
-  const attack   = attacks[Math.floor(Math.random() * attacks.length)];
+  const attack   = attacks[idx % attacks.length] || attacks[0];
 
   // Fase 2: prepara o Modal Flash com opções embaralhadas e gabarito oculto.
   if (phase === 2 && Array.isArray(attack.options)) {
@@ -829,9 +1050,10 @@ app.post('/api/battle', async (req, res) => {
       issues: parsedReq.error.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
     });
   }
-  const { userArgument, user_id, cardType, responseTimeMs, game_phase, theme_id, selected_logic, selected_target, correct_fallacy, selected_option_id } = parsedReq.data;
+  const { userArgument, user_id, cardType, responseTimeMs, game_phase, theme_id, theme_text, selected_logic, selected_target, correct_fallacy, selected_option_id } = parsedReq.data;
 
-  const themeLabel = THEME_LABELS[theme_id] || null;
+  // Tema agora é texto livre: usa o label legado se bater um id antigo, senão o próprio texto.
+  const themeLabel = THEME_LABELS[theme_id] || theme_text || theme_id || null;
   const PHASE_PROMPTS = buildPhasePrompts(themeLabel);
 
   const cardInstruction = CARD_INSTRUCTIONS[cardType] || null;
@@ -935,9 +1157,20 @@ app.post('/api/battle', async (req, res) => {
 
   // Fase 3: instrui IA a rejeitar gibberish antes de avaliar
   if (phase === 3) {
+    // Injeta o contexto socrático que a arena gerou para ESTE tema (Fase 3 viva).
+    let arenaCtx = '';
+    if (user_id) {
+      try {
+        const r = await pool.query('SELECT arena_data FROM user_stats WHERE user_id = $1', [user_id]);
+        const ctxText = r.rows[0]?.arena_data?.phase3_context;
+        if (ctxText) arenaCtx = `\nCONTEXTO DO BOSS FINAL (provocação socrática já lançada ao jogador): "${ctxText}"\nAvalie a réplica do jogador como resposta a essa provocação, dentro do tema.\n`;
+      } catch (e) {
+        console.error('Erro ao ler phase3_context:', e);
+      }
+    }
     basePrompt = basePrompt.replace(
       'Retorne APENAS este JSON válido (sem markdown):',
-      `REGRA ANTI-LIXO (FASE 3): Se o argumento for incompreensível, vazio de conteúdo, ou claramente não for um argumento real (ex: "asdfjkl", "blá blá", frases sem sentido), retorne play_valid=false, boss_damage=0, player_damage=25, e explique no feedback por que não é um argumento válido.\n\nRetorne APENAS este JSON válido (sem markdown):`
+      `${arenaCtx}REGRA ANTI-LIXO (FASE 3): Se o argumento for incompreensível, vazio de conteúdo, ou claramente não for um argumento real (ex: "asdfjkl", "blá blá", frases sem sentido), retorne play_valid=false, boss_damage=0, player_damage=25, e explique no feedback por que não é um argumento válido.\n\nRetorne APENAS este JSON válido (sem markdown):`
     );
   }
 

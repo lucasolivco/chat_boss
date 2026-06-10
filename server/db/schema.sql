@@ -50,6 +50,13 @@ ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS current_player_hp INT DEFAULT 10
 -- o snapshot da opção correta do ataque atual e valida o selected_option_id contra ele.
 ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS current_expected_option JSONB;
 
+-- ─── Pre-Generation Hack: arena de 9 turnos gerada por IA sob o tema livre ──────
+-- POST /api/battle/generate-arena grava aqui o pacote completo (Fase 1/2/3) gerado
+-- pelo Groq a partir do tema digitado pelo jogador. As Fases 1 e 2 passam a ser
+-- servidas DESTE JSONB (latência <20ms, sem nova chamada de LLM por turno).
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS arena_data JSONB;
+ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS arena_theme TEXT;
+
 -- ─── Assessments (dados de pesquisa TCC) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS assessments (
   id SERIAL PRIMARY KEY,

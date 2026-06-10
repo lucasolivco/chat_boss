@@ -40,17 +40,18 @@ export const DEFAULT_TOULMIN_EXAMPLE = {
   warrant: 'já que essa evidência conecta-se diretamente à conclusão por um raciocínio válido.',
 };
 
-// Rótulo legível do tema do EXEMPLO didático do Holo-Guia (para o aviso).
-export const EXAMPLE_THEME_LABELS = {
-  redes_sociais: 'Redes Sociais e Saúde Mental',
-  clima:         'Transição Energética',
-  automacao:     'Automação e Empregos',
-};
+// ─── Holo-Guia UNIVERSAL (estático) ───────────────────────────────────────────
+// Como o tema agora é livre (digitado pelo jogador), o exemplo de Toulmin é FIXO
+// e neutro: um MODELO ESTRUTURAL ABSTRATO que o aluno espelha — independentemente
+// do tema escolhido. Usamos "Mudanças Climáticas" como exemplo universal.
+export const UNIVERSAL_TOULMIN_EXAMPLE = TOULMIN_EXAMPLES.clima;
+export const UNIVERSAL_EXAMPLE_LABEL = 'Mudanças Climáticas';
 
-export function getToulminExample(themeId) {
-  return TOULMIN_EXAMPLES[themeId] || DEFAULT_TOULMIN_EXAMPLE;
+// Mantidas para compat; agora SEMPRE retornam o modelo universal (ignoram themeId).
+export function getToulminExample() {
+  return UNIVERSAL_TOULMIN_EXAMPLE;
 }
 
-export function getExampleThemeLabel(themeId) {
-  return EXAMPLE_THEME_LABELS[themeId] || 'um tema de demonstração';
+export function getExampleThemeLabel() {
+  return UNIVERSAL_EXAMPLE_LABEL;
 }
