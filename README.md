@@ -298,9 +298,11 @@ cd CB
 
 # 2. Variáveis de ambiente — crie server/.env:
 # PORT=3000
-# GROQ_API_KEY=<sua chave>
+# GROQ_API_KEY=<sua chave do console.groq.com>
+# GEMINI_API_KEY=<sua chave do aistudio.google.com>   # fallback automático
 # DATABASE_URL=postgresql://chatboss:chatboss123@localhost:5433/chatboss
 # ADMIN_SECRET=<string secreta para /api/admin/*>
+# LLM_PRIMARY=groq   # opcional: provedor inicial (groq|gemini)
 
 # 3. Dependências
 cd server && npm install
@@ -337,6 +339,16 @@ cd client && npm run dev
 Acesse: **http://localhost:5173**
 
 > **Atenção (Windows):** PostgreSQL nativo ocupa a porta 5432. O projeto usa **5433**. Não alterar.
+
+### Fallback de IA (Groq ⇄ Gemini)
+
+A geração usa **dois provedores com fallback automático**. Se o provedor primário bater
+rate-limit/cota (429), o backend **alterna sozinho** para o outro — dobrando o orçamento diário
+e evitando que o jogo trave por cota esgotada.
+
+- **Groq** `llama-3.3-70b-versatile` (primário por padrão).
+- **Gemini** `gemini-2.5-flash` (fallback; defina `GEMINI_API_KEY`).
+- `LLM_PRIMARY=gemini` inverte a ordem (começa pelo Gemini). Erros que não são de cota não alternam.
 
 ### Modo MOCK — desenvolver sem gastar tokens do Groq
 

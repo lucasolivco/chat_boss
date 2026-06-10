@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { readFileSync } from 'fs';
@@ -17,6 +18,78 @@ if (!process.env.GROQ_API_KEY) {
 }
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const gemini = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
+
+// ─── Geração JSON com FALLBACK entre provedores (Groq ⇄ Gemini) ───────────────
+// Tenta o provedor preferido; se bater rate-limit/cota, alterna para o outro e
+// memoriza a troca (próxima chamada já começa pelo provedor saudável). Ambos
+// retornam JSON puro (string). Erros que não são de cota sobem normalmente.
+const LLM_PROVIDERS = ['groq', 'gemini'];
+// Provedor inicial configurável via LLM_PRIMARY=gemini|groq (default: groq).
+// O fallback alterna automaticamente em rate-limit, independente do primário.
+let llmCursor = process.env.LLM_PRIMARY === 'gemini' ? 1 : 0;
+
+function isRateLimitError(err) {
+  const status = err?.status ?? err?.response?.status;
+  if (status === 429) return true;
+  const msg = String(err?.message || '').toLowerCase();
+  return /rate.?limit|quota|resource_exhausted|too many requests|tokens per day|tpd|tpm/.test(msg);
+}
+
+async function callGroqJSON(prompt, { maxTokens, temperature, timeout }) {
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'llama-3.3-70b-versatile',
+    temperature,
+    max_tokens: maxTokens,
+    response_format: { type: 'json_object' },
+  }, { timeout });
+  return completion.choices[0]?.message?.content || '{}';
+}
+
+async function callGeminiJSON(prompt, { maxTokens, temperature }) {
+  if (!gemini) throw new Error('GEMINI_API_KEY ausente');
+  const model = gemini.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature,
+      maxOutputTokens: maxTokens,
+      // Desliga o "thinking" do 2.5-flash: economiza tokens e evita resposta vazia.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+  const result = await model.generateContent(prompt);
+  return result.response.text() || '{}';
+}
+
+// Gera JSON tentando os provedores em ordem rotativa; alterna em rate-limit.
+// Retorna { text, provider }. Lança o último erro se ambos falharem.
+async function generateLLMJson(prompt, { maxTokens = 4096, temperature = 0.8, timeout = 40000 } = {}) {
+  let lastErr;
+  for (let i = 0; i < LLM_PROVIDERS.length; i++) {
+    const provider = LLM_PROVIDERS[(llmCursor + i) % LLM_PROVIDERS.length];
+    if (provider === 'gemini' && !gemini) continue; // sem chave → pula
+    try {
+      const text = provider === 'groq'
+        ? await callGroqJSON(prompt, { maxTokens, temperature, timeout })
+        : await callGeminiJSON(prompt, { maxTokens, temperature });
+      return { text, provider };
+    } catch (err) {
+      lastErr = err;
+      if (isRateLimitError(err)) {
+        // Provedor no limite → fixa o cursor no PRÓXIMO para as chamadas seguintes.
+        llmCursor = (llmCursor + i + 1) % LLM_PROVIDERS.length;
+        console.warn(`[LLM] ${provider} no limite — alternando provedor.`);
+        continue;
+      }
+      throw err; // erro não-relacionado a cota → propaga
+    }
+  }
+  throw lastErr || new Error('Nenhum provedor de LLM disponível.');
+}
 
 // ─── Validação da resposta da IA (Zod) ────────────────────────────────────────
 // Garante que o JSON da IA bate com o schema antes de virar dano no jogo.
@@ -830,27 +903,33 @@ app.post('/api/battle/generate-arena', async (req, res) => {
     let parsed = null;
     let lastIssues = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const completion = await groq.chat.completions.create({
-        messages: [{ role: 'user', content: buildArenaPrompt(themeText) }],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.8, // rigor de classificação > criatividade solta
-        max_tokens: 8000, // headroom p/ o Chain-of-Thought + voz humorística sem truncar
-        response_format: { type: 'json_object' },
-      }, { timeout: 40000 });
+      let content, usedProvider;
+      try {
+        const out = await generateLLMJson(buildArenaPrompt(themeText), {
+          maxTokens: 8000, // headroom p/ Chain-of-Thought + voz humorística sem truncar
+          temperature: 0.8, // rigor de classificação > criatividade solta
+          timeout: 40000,
+        });
+        content = out.text; usedProvider = out.provider;
+      } catch (e) {
+        // Ambos os provedores indisponíveis (cota dupla / erro de rede).
+        console.error(`Arena tentativa ${attempt}: nenhum provedor respondeu — ${e.message}`);
+        break;
+      }
 
       let raw;
       try {
-        raw = JSON.parse(completion.choices[0]?.message?.content || '{}');
+        raw = JSON.parse(content || '{}');
       } catch {
         lastIssues = 'JSON.parse falhou (resposta truncada?)';
-        console.error(`Arena tentativa ${attempt}: ${lastIssues}`);
+        console.error(`Arena tentativa ${attempt} (${usedProvider}): ${lastIssues}`);
         continue;
       }
 
       const result = arenaSchema.safeParse(raw);
       if (result.success) { parsed = result; break; }
       lastIssues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).slice(0, 6);
-      console.error(`Arena tentativa ${attempt} fora do schema:`, lastIssues);
+      console.error(`Arena tentativa ${attempt} (${usedProvider}) fora do schema:`, lastIssues);
     }
 
     if (!parsed) {
@@ -1392,12 +1471,10 @@ app.post('/api/battle', async (req, res) => {
   const prompt = `${basePrompt}${structuredContext}\n\nArgumento do desafiante: "${userArgument}"`;
 
   try {
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    }, { timeout: 15000 }); // 15s timeout (request option, não vai no corpo da API)
+    // Fallback Groq ⇄ Gemini: se um provedor estiver no limite, usa o outro.
+    const { text: content } = await generateLLMJson(prompt, {
+      maxTokens: 1024, temperature: 0.7, timeout: 15000,
+    });
 
     let gameData;
     const fallback = {
@@ -1407,7 +1484,7 @@ app.post('/api/battle', async (req, res) => {
       fallacy_detected: null, play_valid: null,
     };
     try {
-      const raw = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      const raw = JSON.parse(content || '{}');
       const parsed = battleSchema.safeParse(raw);
       gameData = parsed.success ? parsed.data : fallback;
       if (!parsed.success) console.error('Resposta da IA fora do schema:', parsed.error.issues);
