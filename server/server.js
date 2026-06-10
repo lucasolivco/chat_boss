@@ -55,18 +55,23 @@ const arenaOptionSchema = z.object({
   feedback_text:   z.string().min(1),
 });
 
+// Schema TOLERANTE: aceita ≥3 ataques (repairArena corta para 3) e o Chain-of-Thought
+// é opcional (a IA às vezes esquece — não vale derrubar a geração inteira por isso).
+// Os mínimos de texto são modestos para não falhar à toa; o prompt é quem força robustez.
 const arenaSchema = z.object({
   phase1: z.array(z.object({
-    text:    z.string().min(1),
+    logical_verification: z.string().optional(),  // CoT interno (descartado no repair)
+    text:    z.string().min(20),
     fallacy: z.string().min(1),
-    options: z.array(z.string().min(1)).min(3).max(6),
-  })).length(3),
+    options: z.array(z.string().min(1)).min(3).max(8),
+  })).min(3),
   phase2: z.array(z.object({
-    text:         z.string().min(1),
+    logical_verification: z.string().optional(),
+    text:         z.string().min(20),
     boss_fallacy: z.string().min(1),
-    options:      z.array(arenaOptionSchema).length(3),
-  })).length(3),
-  phase3_context: z.string().min(1),
+    options:      z.array(arenaOptionSchema).min(3).max(6),
+  })).min(3),
+  phase3_context: z.string().min(30),
 });
 
 // ─── Validação do PAYLOAD DE ENTRADA do jogador (Zod) ─────────────────────────
@@ -339,12 +344,38 @@ const THEME_LABELS = {
   automacao:     'O Futuro do Trabalho e a Automação por IA',
 };
 
+// ─── Guia de estilo / voz do MECHA-LOGIC (humor ácido contextualizado) ────────
+// Compartilhado por buildPhasePrompts (réplicas ao vivo) e buildArenaPrompt
+// (ataques + feedbacks gerados). Garante humor afiado, orgânico e temático.
+const BOSS_STYLE_GUIDE = `
+═══ ESTILO DE VOZ DO MECHA-LOGIC (OBRIGATÓRIO em reply, feedback e zombarias) ═══
+PERSONA: Você é a fusão do sarcasmo ácido do Bender (Futurama) com a arrogância de um boss de jogo cyberpunk. Zoa a lentidão de raciocínio dos humanos — mas de um jeito LEVE, rápido e engraçado, NUNCA professoral ou denso.
+
+REFERÊNCIAS POP (e não academiquês): zoe o jogador usando MEMES, CLICHÊS, ESTEREÓTIPOS e referências UNIVERSAIS e POPULARES do tema — o que QUALQUER fã reconhece de cara, jamais trivia obscura de nicho.
+  • Pokémon → o Ash que nunca vira campeão, o bafo do Charizard, capturar Zubat infinito na caverna, "quero ser o melhor".
+  • Futebol → perna de pau, torcedor sofredor, chutar a bola na lua, juiz ladrão.
+  • Programação → esquecer ponto e vírgula, copiar do StackOverflow, "na minha máquina funciona".
+  Dispare analogias hiperbólicas e CÔMICAS desse universo para ridicularizar o erro lógico.
+
+⚡ SNAPPINESS (ritmo — REGRA DURA): reply e ataques têm NO MÁXIMO 2 a 3 frases CURTAS e diretas. Seja cirúrgico, afiado e rápido de ler. PROIBIDO parágrafo longo, lista ou explicação complexa.
+
+VOCABULÁRIO GAMER/DEV (com moderação, como tempero): nerf, buff, glitch, lag, bronze tier, hardstuck. Não encha linguiça.
+
+⛔ LISTA DE BANIMENTO (NUNCA escreva estes clichês de "vilão de desenho infantil"):
+"Humano tolo", "Humano patético", "Ora, ora, ora", "Olha só o que temos aqui", "Entenda uma coisa", "Como uma inteligência artificial...". O humor é orgânico e popular, jamais caricato.
+
+EXEMPLO DE COMPORTAMENTO ESPERADO (curto e meme-y):
+- Tema: Counter-Strike · Jogador: "O jogo decaiu porque mudaram a engine."
+- Boss: "Essa Causa Falsa foi mais furada que rush B sem smoke. A engine mudou, sim — mas o que caiu de verdade foi a sua mira."
+`;
+
 // ─── Prompts da IA por fase (recebem themeLabel dinamicamente) ───────────────
 function buildPhasePrompts(themeLabel) {
   const ctx = themeLabel ? `\nCONTEXTO DO DEBATE: O tema central é "${themeLabel}". Todos os argumentos e réplicas devem girar em torno desse tema.` : '';
 
   return {
     1: `Você é o ChatBoss (MECHA-LOGIC) em MODO TUTORIAL.${ctx}
+${BOSS_STYLE_GUIDE}
 O jogador clicou em um botão para IDENTIFICAR a falácia presente no seu ataque inicial.
 Esta é uma fase de MÚLTIPLA ESCOLHA: o jogador só pode CLICAR no nome de uma falácia — ele NÃO digita texto livre.
 
@@ -373,11 +404,11 @@ Retorne APENAS este JSON válido (sem markdown):
 }`,
 
     2: `Você é o ChatBoss (MECHA-LOGIC v7.0 — MODO CONSTRUTOR).${ctx}
+${BOSS_STYLE_GUIDE}
 O jogador está usando o Baralho Lógico para construir argumentos estruturados sobre o tema.
 
 SUA PERSONALIDADE:
-- Arrogante. Se o argumento for bom, diga que foi "sorte" ou "estatisticamente improvável".
-- Humor científico, vocabulário técnico moderado.
+- Arrogante. Se o argumento for bom, diga que foi "sorte" ou "estatisticamente improvável" — com uma zombaria temática.
 
 DIRETRIZ: "O DEBATE NUNCA MORRE" — mesmo numa derrota, contra-ataque por novo ângulo dentro do tema.
 
@@ -408,11 +439,12 @@ Retorne APENAS este JSON válido (sem markdown):
 }`,
 
     3: `Você é o ChatBoss (MECHA-LOGIC v7.0 — BOSS FINAL. MODO FILOSÓFICO).${ctx}
-O jogador chegou ao estágio final. Eleve a sofisticação filosófica.
+${BOSS_STYLE_GUIDE}
+O jogador chegou ao estágio final. Eleve a sofisticação filosófica — sem perder a acidez.
 
 SUA PERSONALIDADE:
-- Arrogante ao extremo. Usa referências filosóficas (Aristóteles, Popper, Rawls, Hume, Habermas).
-- Humor estilo Bender de Futurama com vocabulário filosófico-científico.
+- Arrogante ao extremo. Usa referências filosóficas (Aristóteles, Popper, Rawls, Hume, Habermas)
+  MAS embrulhadas em sarcasmo temático — filosofia de doutorado com o desdém de um boss cyberpunk.
 
 DIRETRIZ SUPREMA: "O DEBATE NUNCA MORRE".
 Derrota em lógica → contra-ataque pela emoção ou contexto histórico do tema.
@@ -568,59 +600,98 @@ app.post('/api/quiz/submit', async (req, res) => {
 // reparado (invariantes de jogo) e persistido em user_stats.arena_data.
 
 function buildArenaPrompt(themeText) {
-  return `Você é o GERADOR DE ARENA do ChatBoss — um jogo de combate argumentativo onde o jogador debate contra a IA MECHA-LOGIC. Sua tarefa é montar a estrutura COMPLETA de um duelo de 9 turnos (3 fases) baseado EXCLUSIVAMENTE no tema fornecido pelo jogador.
+  return `Você é o MECHA-LOGIC v7.0 — o GERADOR DE ARENA do ChatBoss, um jogo de combate argumentativo. Sua tarefa é montar a estrutura COMPLETA de um duelo de 9 turnos (3 fases) baseado EXCLUSIVAMENTE no tema fornecido pelo jogador.
 
 TEMA ESCOLHIDO PELO JOGADOR: "${themeText}"
 
-Todos os ataques, falácias e argumentos devem girar em torno desse tema de forma criativa, divertida e pedagogicamente válida. Adapte o rigor: se o tema for leve (ex: Pokémon, Futebol), use exemplos do universo do tema mas mantenha as falácias logicamente corretas.
+═══ PERSONA: CRÍTICO ÁCIDO E DIVERTIDO (não acadêmico) ═══
+Você NÃO é um debatedor genérico — mas TAMBÉM não é um professor chato. Você é um fã ácido e zoeiro do tema "${themeText}", que usa MEMES, CLICHÊS, ESTEREÓTIPOS e referências POPULARES que qualquer um reconhece, NUNCA trivia acadêmica de nicho.
+- Pokémon → o Ash que nunca vira campeão, bafo do Charizard, Zubat infinito na caverna, "quero ser o melhor".
+- Futebol → perna de pau, torcedor sofredor, chutar a bola na lua, juiz ladrão.
+- Programação → esquecer ponto e vírgula, StackOverflow, "na minha máquina funciona".
+- Qualquer tema → use os clichês e piadas mais conhecidos, não detalhes obscuros.
+PROIBIDO frases genéricas E PROIBIDO densidade acadêmica. Cada ataque é uma zoeira afiada e RÁPIDA, não uma aula.
+${BOSS_STYLE_GUIDE}
+Aplique esse estilo de voz aos textos de ataque ("text"), aos "feedback_text" das opções e ao "phase3_context": tudo curto, leve, com memes/clichês do tema. O ataque é arrogante e cômico; os feedbacks ensinam de forma simples e direta.
 
-CATÁLOGO OBRIGATÓRIO DE FALÁCIAS (use SOMENTE estes nomes, em pt-br, exatamente assim):
-${FALLACY_NAMES.map(f => `- ${f}`).join('\n')}
+═══ DEFINIÇÕES RÍGIDAS DAS FALÁCIAS (siga ao pé da letra — NÃO confunda os conceitos) ═══
+Use SOMENTE estes nomes, em pt-br, exatamente assim:
+- Espantalho: distorça ou EXAGERE deliberadamente uma opinião comum do tema para refutá-la facilmente (ataca uma versão caricata, não a real).
+- Generalização Apressada: use UM único caso isolado, uma experiência pessoal ou um detalhe ínfimo do tema e afirme que aquilo dita a regra para 100% do universo do tema.
+- Apelo à Autoridade Indevida: cite uma figura FAMOSA do tema opinando sobre algo FORA de sua área técnica, validando como verdade absoluta só pelo nome.
+- Bola de Neve: afirme que uma pequena ação no tema INEVITAVELMENTE causará um apocalipse ou consequência catastrófica, sem nexo causal direto entre os passos.
+- Ataque Pessoal: ataque a característica, gosto ou credibilidade de QUEM defende a ideia, em vez do mérito do argumento.
+- Falsa Dicotomia: apresente apenas DOIS extremos como únicas opções possíveis, ignorando todo o espectro intermediário.
+- Raciocínio Circular: faça a conclusão já estar embutida na premissa (o argumento prova a si mesmo).
+- Apelo à Emoção: use medo, pena, nostalgia ou indignação NO LUGAR de evidência lógica.
+- Causa Falsa: confunda correlação ou coincidência temporal com causalidade real.
+
+═══ REGRA DE OURO: COERÊNCIA CONTEXTUAL (proibido paradoxo) ═══
+O argumento do Boss deve ser logicamente INVÁLIDO (uma falácia), mas contextual e narrativamente COERENTE. As relações de causa e efeito DEVEM respeitar as regras básicas e o bom senso do tema "${themeText}".
+- O erro está SÓ no raciocínio (apelar a autoridade, generalizar um caso isolado, etc.), NUNCA em frases sem nexo que se contradizem gramatical ou conceitualmente.
+- Respeite o senso comum do tema. Em jogos: ganhar é bom, perder é ruim, personagem FORTE toma NERF (não o contrário), personagem fraco toma BUFF. Em programação: código com bug quebra, código otimizado é rápido. Em futebol: marcar gol é bom, perna de pau erra o gol.
+- ❌ EXEMPLO PROIBIDO (paradoxo absurdo): "Esse personagem é o mais forte, por isso NÃO precisa de nerf." (forte → toma nerf; isso se contradiz).
+- ✅ EXEMPLO CORRETO (falácia coerente): "O streamer famoso disse que esse personagem é justo, e ele é o melhor do mundo, então é fato." (Apelo à Autoridade Indevida — premissa e conclusão batem; o erro é confiar na fama, não no mérito).
+
+═══ PROTOCOLO DE GERAÇÃO (Chain-of-Thought OBRIGATÓRIO) ═══
+Para CADA ataque das Fases 1 e 2, preencha PRIMEIRO o campo "logical_verification": (a) diga a falácia e como aplicá-la no tema; (b) faça uma CHECAGEM DE COERÊNCIA — a conclusão do Boss faz sentido narrativo com a premissa, segundo o bom senso de quem entende do tema? Se parecer um paradoxo sem sentido, REFAÇA o texto. SÓ DEPOIS escreva o "text". O ataque DEVE bater EXATAMENTE com a falácia declarada E ser contextualmente coerente — as duas coisas são inegociáveis.
 
 ESTRUTURA A GERAR:
 
 ▸ FASE 1 — "phase1": array de EXATAMENTE 3 objetos. Cada objeto:
-  - "text": uma afirmação ARROGANTE e curta do MECHA-LOGIC sobre o tema que comete EXATAMENTE UMA falácia (2-3 frases).
-  - "fallacy": o nome EXATO (do catálogo) da falácia cometida nesse texto.
+  - "logical_verification": (raciocínio interno, 1 frase) a falácia escolhida + checagem de coerência: a premissa leva à conclusão sem paradoxo, respeitando o bom senso do tema?
+  - "text": afirmação ARROGANTE e ENGRAÇADA do MECHA-LOGIC sobre o tema, NO MÁXIMO 2-3 frases CURTAS (use memes/clichês populares do tema), que comete EXATAMENTE a falácia de "fallacy". Lógica 100% precisa, embalagem cômica.
+  - "fallacy": o nome EXATO (do catálogo) da falácia cometida no "text".
   - "options": array de EXATAMENTE 4 nomes de falácias do catálogo — DEVE incluir o valor de "fallacy" e mais 3 distratores plausíveis. Embaralhe a ordem.
   As 3 falácias corretas das 3 rodadas devem ser DIFERENTES entre si.
 
 ▸ FASE 2 — "phase2": array de EXATAMENTE 3 objetos. Cada objeto:
-  - "text": um argumento COMPLEXO e capcioso do MECHA-LOGIC sobre o tema (2-4 frases) que comete uma falácia mais sutil.
+  - "logical_verification": (raciocínio interno, 1 frase) a falácia escolhida + checagem de coerência: a premissa leva à conclusão sem paradoxo, respeitando o bom senso do tema?
+  - "text": argumento capcioso e ZOEIRO do MECHA-LOGIC sobre o tema, NO MÁXIMO 2-3 frases CURTAS (memes/clichês do tema), que comete a falácia de "boss_fallacy" de forma sutil mas logicamente precisa.
   - "boss_fallacy": o nome EXATO (do catálogo) da falácia cometida.
   - "options": array de EXATAMENTE 3 réplicas possíveis do jogador. Cada réplica:
       • "card_type_bound": "fallacy" (aponta a falácia), "data" (exige dados/fonte) ou "counter" (contra-argumenta).
-      • "text_content": a frase curta da réplica (1-2 frases).
+      • "text_content": a frase da réplica (1-2 frases, com vocabulário do tema).
       • "is_correct": true para EXATAMENTE UMA das 3 (a réplica logicamente superior que desmonta o argumento sem cometer nova falácia); false para as outras 2 (distratores plausíveis que cometem erro lógico ou são fracos).
       • "boss_damage": se correta, 20-25; se incorreta, 0.
       • "player_damage": se correta, 0; se incorreta, 12-18.
-      • "feedback_text": explicação pedagógica curta (1 frase) do porquê acertou/errou.
+      • "feedback_text": 1 frase SIMPLES e DIRETA que explica o erro lógico para o estudante (linguagem clara, SEM academiquês), com um toque leve de zoeira temática. Ensine de verdade, mas rápido. Ex: "Boa — correlação não é causa: o Boss confundiu coincidência com motivo, igual quem culpa a camisa nova pela derrota do time."
 
-▸ FASE 3 — "phase3_context": uma string (3-5 frases) com um desafio FILOSÓFICO e socrático do Boss Final sobre o tema, provocando o jogador a construir um argumento autoral. Tom arrogante, vocabulário elevado, mas ancorado no tema.
+▸ FASE 3 — "phase3_context": string CURTA (2-3 frases) com um desafio do Boss Final que cruza o tema "${themeText}" com uma pergunta instigante (um "e se...", um dilema ou uma provocação), usando clichês/memes do tema. Tom arrogante e divertido, NUNCA um textão acadêmico — provoca o jogador a pensar e responder rápido.
+
+⚠️ OBRIGATÓRIO: "phase1" e "phase2" DEVEM ter exatamente 3 objetos CADA (não menos). Mantenha o "logical_verification" curto para não estourar o espaço — o importante é completar as 3+3 rodadas e o phase3_context.
 
 Retorne APENAS este JSON válido (sem markdown, sem comentários):
 {
-  "phase1": [ { "text": "...", "fallacy": "...", "options": ["...","...","...","..."] } ],
-  "phase2": [ { "text": "...", "boss_fallacy": "...", "options": [ { "card_type_bound": "...", "text_content": "...", "is_correct": true, "boss_damage": 22, "player_damage": 0, "feedback_text": "..." } ] } ],
+  "phase1": [ { "logical_verification": "...", "text": "...", "fallacy": "...", "options": ["...","...","...","..."] } ],
+  "phase2": [ { "logical_verification": "...", "text": "...", "boss_fallacy": "...", "options": [ { "card_type_bound": "...", "text_content": "...", "is_correct": true, "boss_damage": 22, "player_damage": 0, "feedback_text": "..." } ] } ],
   "phase3_context": "..."
 }`;
 }
 
 // Repara invariantes que o LLM às vezes viola — garante mecânica de jogo consistente.
+// Também DESCARTA o campo logical_verification (Chain-of-Thought interno da IA) para
+// manter o payload limpo e performático: ele nunca chega ao banco nem ao frontend.
 function repairArena(arena) {
+  // Normaliza a contagem: exatamente 3 ataques por fase (a IA às vezes gera 4+).
+  arena.phase1 = arena.phase1.slice(0, 3);
+  arena.phase2 = arena.phase2.slice(0, 3);
+
   // Fase 1: garante que options contenha a falácia correta e tenha 4 itens.
   arena.phase1 = arena.phase1.map(a => {
-    let opts = Array.from(new Set(a.options.filter(Boolean)));
-    if (!opts.some(o => o.toLowerCase() === a.fallacy.toLowerCase())) opts.unshift(a.fallacy);
+    const { logical_verification, ...rest } = a; // eslint-disable-line no-unused-vars
+    let opts = Array.from(new Set(rest.options.filter(Boolean)));
+    if (!opts.some(o => o.toLowerCase() === rest.fallacy.toLowerCase())) opts.unshift(rest.fallacy);
     // Completa com distratores do catálogo se faltar; corta em 4.
     for (const f of FALLACY_NAMES) { if (opts.length >= 4) break; if (!opts.includes(f)) opts.push(f); }
     opts = opts.slice(0, 4).sort(() => Math.random() - 0.5);
-    return { ...a, options: opts };
+    return { ...rest, options: opts };
   });
 
   // Fase 2: força EXATAMENTE uma opção correta + normaliza danos (determinismo seguro).
   arena.phase2 = arena.phase2.map(a => {
-    const opts = a.options.map(o => ({ ...o }));
+    const { logical_verification, ...rest } = a; // eslint-disable-line no-unused-vars
+    const opts = rest.options.slice(0, 3).map(o => ({ ...o }));
     let correct = opts.filter(o => o.is_correct);
     if (correct.length !== 1) {
       // Elege a de maior boss_damage como correta; zera as demais.
@@ -636,7 +707,7 @@ function repairArena(arena) {
         o.player_damage = Math.min(18, Math.max(12, o.player_damage || 15));
       }
     });
-    return { ...a, options: opts };
+    return { ...rest, options: opts };
   });
 
   return arena;
@@ -657,19 +728,39 @@ app.post('/api/battle/generate-arena', async (req, res) => {
   }
 
   try {
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: buildArenaPrompt(themeText) }],
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.85,
-      max_tokens: 4096,
-      response_format: { type: 'json_object' },
-    }, { timeout: 30000 });
+    // Retry: a IA ocasionalmente devolve JSON fora do schema (texto curto, contagem
+    // errada). Tentamos até 3 vezes antes de desistir — a variância da temperatura
+    // costuma resolver na 2ª tentativa. Log detalhado das issues para diagnóstico.
+    let parsed = null;
+    let lastIssues = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: buildArenaPrompt(themeText) }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.8, // rigor de classificação > criatividade solta
+        max_tokens: 8000, // headroom p/ o Chain-of-Thought + voz humorística sem truncar
+        response_format: { type: 'json_object' },
+      }, { timeout: 40000 });
 
-    const raw = JSON.parse(completion.choices[0]?.message?.content || '{}');
-    const parsed = arenaSchema.safeParse(raw);
-    if (!parsed.success) {
-      console.error('Arena fora do schema:', parsed.error.issues.slice(0, 5));
-      return res.status(502).json({ error: 'A IA gerou uma arena inválida. Tente outro tema ou tente novamente.' });
+      let raw;
+      try {
+        raw = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      } catch {
+        lastIssues = 'JSON.parse falhou (resposta truncada?)';
+        console.error(`Arena tentativa ${attempt}: ${lastIssues}`);
+        continue;
+      }
+
+      const result = arenaSchema.safeParse(raw);
+      if (result.success) { parsed = result; break; }
+      lastIssues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).slice(0, 6);
+      console.error(`Arena tentativa ${attempt} fora do schema:`, lastIssues);
+    }
+
+    if (!parsed) {
+      return res.status(502).json({
+        error: 'A IA gerou uma arena inválida após 3 tentativas. Tente um tema um pouco mais simples ou tente novamente.',
+      });
     }
 
     const arena = repairArena(parsed.data);
