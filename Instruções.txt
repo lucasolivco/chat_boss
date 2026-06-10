@@ -7,20 +7,42 @@ Este guia contém o passo a passo para configurar o projeto na sua máquina.
 PRÉ-REQUISITOS:
 1. Node.js instalado (Versão 18 ou superior).
 2. Git instalado.
+3. Docker Desktop instalado e ABERTO (usado para o banco de dados PostgreSQL).
+   >> Baixe em: https://www.docker.com/products/docker-desktop
 
----
+
+-------------------------------------------------------------------
 PASSO 1: BAIXAR O PROJETO
----
+-------------------------------------------------------------------
 1. Abra o terminal ou Git Bash.
 2. Clone o repositório:
-   git clone https://github.com/SEU_USUARIO/chatboss-tcc.git
+   git clone https://github.com/lucasolivco/chat_boss.git
 3. Entre na pasta:
-   cd chatboss-tcc
+   cd chat_boss
 
----
-PASSO 2: CONFIGURAR O BACKEND (SERVIDOR)
----
-(Responsável pela inteligência artificial)
+
+-------------------------------------------------------------------
+PASSO 2: SUBIR O BANCO DE DADOS (PostgreSQL via Docker)
+-------------------------------------------------------------------
+(O jogo guarda jogadores, pontuação e as arenas geradas pela IA)
+
+1. Deixe o Docker Desktop ABERTO.
+
+2. Na pasta principal do projeto (chat_boss), rode:
+   docker-compose up -d
+
+   >> Isso cria um banco PostgreSQL na porta 5433.
+   >> (Usamos 5433 de propósito para não brigar com um Postgres já instalado.)
+
+3. Crie as tabelas (só na primeira vez):
+   docker exec -i cb-postgres-1 psql -U chatboss -d chatboss < server/db/schema.sql
+
+   >> Pode rodar de novo sem medo: o script não apaga dados.
+
+
+-------------------------------------------------------------------
+PASSO 3: CONFIGURAR O BACKEND (SERVIDOR / IA)
+-------------------------------------------------------------------
 
 1. No terminal, entre na pasta do servidor:
    cd server
@@ -33,58 +55,102 @@ PASSO 2: CONFIGURAR O BACKEND (SERVIDOR)
    - Abra esse arquivo e cole o seguinte:
 
    PORT=3000
+   DATABASE_URL=postgresql://chatboss:chatboss123@localhost:5433/chatboss
    GEMINI_API_KEY=Cole_Aqui_A_Chave_Do_Google_AI_Studio
+   GROQ_API_KEY=Cole_Aqui_A_Chave_Do_Groq_(opcional)
+   LLM_PRIMARY=gemini
 
-   (Obs: Se você não tem a chave, peça para a dupla ou gere uma grátis em aistudio.google.com)
+   (Obs sobre as chaves de IA — você precisa de PELO MENOS UMA:)
+   - GEMINI_API_KEY: gere grátis em https://aistudio.google.com  (recomendada)
+   - GROQ_API_KEY: gere grátis em https://console.groq.com  (opcional, mais rápida)
+   - Se colocar as DUAS, o sistema usa uma e troca AUTOMATICAMENTE para a outra
+     quando uma fica sem cota (rate limit). Comece pela do "LLM_PRIMARY".
+   - Se for usar SÓ o Gemini, deixe LLM_PRIMARY=gemini (como acima).
+     Se for usar SÓ o Groq, troque para LLM_PRIMARY=groq.
 
 4. Rode o servidor:
    node server.js
 
-   >> Se aparecer "🤖 ChatBoss rodando na porta 3000", DEIXE ESSE TERMINAL ABERTO.
+   >> Se aparecer "ChatBoss Server rodando na porta 3000", DEIXE ESSE TERMINAL ABERTO.
 
----
-PASSO 3: CONFIGURAR O FRONTEND (O JOGO)
----
+
+-------------------------------------------------------------------
+PASSO 4: CONFIGURAR O FRONTEND (O JOGO)
+-------------------------------------------------------------------
 (A interface visual onde jogamos)
 
 1. Abra um NOVO TERMINAL (não feche o anterior).
 2. Entre na pasta do cliente:
    cd client
-   (Ou "cd chatboss-tcc/client" se abriu um terminal novo do zero)
+   (Ou "cd chat_boss/client" se abriu um terminal novo do zero)
 
 3. Instale as dependências:
    npm install
 
-4. Configure o IP (.env):
-   - Crie um arquivo novo chamado ".env" dentro da pasta "client".
-   - Cole o endereço do backend.
-   
+   >> NÃO precisa criar .env no cliente: ele já encontra o servidor sozinho
+      (o Vite redireciona /api -> http://localhost:3000 automaticamente).
+
+4. Rode o jogo:
+
    OPÇÃO A (Só no seu PC):
-   VITE_API_URL=http://localhost:3000
+   npm run dev
 
    OPÇÃO B (Para testar no Celular via Wi-Fi):
-   Descubra o IP do seu PC (ex: 192.168.1.50) e coloque:
-   VITE_API_URL=http://192.168.1.50:3000
+   npm run dev:host
 
-5. Rode o jogo:
-   npm run dev -- --host
 
----
-PASSO 4: COMO ACESSAR
----
-Depois de rodar o passo 3, o terminal vai mostrar os links:
+-------------------------------------------------------------------
+PASSO 5: COMO ACESSAR
+-------------------------------------------------------------------
+Depois de rodar o Passo 4, o terminal mostra os links:
 
-- No Computador: Clique no link "Local" (geralmente http://localhost:5173).
-- No Celular: Conecte no mesmo Wi-Fi e acesse o link "Network" que aparece no terminal.
+- No Computador: clique no link "Local" (geralmente http://localhost:5173).
+- No Celular: conecte no MESMO Wi-Fi e acesse o link "Network" que aparece
+  no terminal (ex: http://192.168.1.50:5173). Use a OPÇÃO B do Passo 4.
 
----
+
+-------------------------------------------------------------------
+DICA: TESTAR SEM GASTAR COTA DA IA (modo MOCK)
+-------------------------------------------------------------------
+Se você quer só mexer no visual/jogabilidade sem gastar as chaves de IA,
+rode o servidor assim (no lugar de "node server.js"):
+
+   No Windows (PowerShell):   $env:MOCK_ARENA=1 ; node server.js
+   No Git Bash / Linux/Mac:   MOCK_ARENA=1 node server.js
+
+Nesse modo a arena vem de um arquivo fixo (server/mockArena.json) e o jogo
+roda inteiro SEM chamar a IA. Para voltar ao normal, rode "node server.js".
+
+
+-------------------------------------------------------------------
+COMO JOGAR (resumo)
+-------------------------------------------------------------------
+1. Digite seu apelido.
+2. Escolha QUALQUER tema (ex: Pokémon, Futebol, Cinema) -> "GERAR ARENA".
+   (A IA cria um duelo sob medida; leva alguns segundos.)
+3. São 8 rodadas:
+   - Fase 1 (3 rodadas): clique na falácia que o Boss cometeu.
+   - Fase 2 (3 rodadas): escolha a melhor réplica no Modal Flash.
+   - Fase 3 (2 rodadas): contra-ataque guiado + argumento final autoral.
+4. Cada acerto vale PONTOS. Faça 500+ pontos para vencer o MECHA-LOGIC.
+
+
+-------------------------------------------------------------------
 SOLUÇÃO DE PROBLEMAS
----
+-------------------------------------------------------------------
 1. "Erro de conexão com o Boss":
-   Verifique se você esqueceu de rodar o Passo 2 (node server.js).
+   Verifique se o servidor (Passo 3) está rodando em outro terminal.
 
-2. Erro "404 Not Found" no servidor:
-   A chave do Google pode estar errada ou o modelo de IA mudou.
+2. Erro ao subir o banco / "port 5433 already allocated":
+   Já existe algo na porta 5433. Pare o outro container/Postgres, ou
+   confira se o Docker Desktop está aberto. Rode "docker-compose up -d" de novo.
 
-3. Tela branca ou erro no navegador:
+3. "A IA gerou uma arena inválida" ou geração travando:
+   A cota da IA pode ter esgotado. Coloque a SEGUNDA chave no .env (Gemini + Groq)
+   para o sistema trocar de provedor sozinho, ou espere a cota resetar.
+
+4. Tela branca ou erro no navegador:
    Aperte F12 para ver o Console e mande o print do erro.
+
+5. Geração muito lenta (10-15s):
+   Normal quando está usando o Gemini. Com a chave do Groq fica mais rápido (~5s).

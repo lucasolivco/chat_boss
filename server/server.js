@@ -13,11 +13,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-if (!process.env.GROQ_API_KEY) {
-  console.error('ERRO: GROQ_API_KEY não encontrada no .env');
+if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) {
+  console.error('ERRO: defina ao menos uma chave de IA no .env (GROQ_API_KEY e/ou GEMINI_API_KEY).');
 }
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groqEnabled = !!process.env.GROQ_API_KEY;
 const gemini = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
@@ -73,7 +74,9 @@ async function generateLLMJson(prompt, { maxTokens = 4096, temperature = 0.8, ti
   for (let i = 0; i < LLM_PROVIDERS.length; i++) {
     const idx = (start + i) % LLM_PROVIDERS.length;
     const provider = LLM_PROVIDERS[idx];
-    if (provider === 'gemini' && !gemini) continue; // sem chave → pula
+    // Pula um provedor cuja chave não foi configurada (permite usar só 1 dos dois).
+    if (provider === 'gemini' && !gemini) continue;
+    if (provider === 'groq' && !groqEnabled) continue;
     try {
       const text = provider === 'groq'
         ? await callGroqJSON(prompt, { maxTokens, temperature, timeout })
