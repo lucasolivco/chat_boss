@@ -4,6 +4,7 @@ import cors from 'cors';
 import Groq from 'groq-sdk';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { readFileSync } from 'fs';
 import pool from './db/index.js';
 import { calcTitle } from './db/titles.js';
 
@@ -669,6 +670,80 @@ Retorne APENAS este JSON válido (sem markdown, sem comentários):
 }`;
 }
 
+// ─── Arena MOCK (modo de teste — ZERO chamadas ao Groq, ZERO tokens) ──────────
+// Ativado por MOCK_ARENA=1 no ambiente OU pelo body { mock: true }. Serve uma arena
+// estática real (server/mockArena.json) — capture uma geração de qualidade, cole o
+// arena_data lá e teste o fluxo (boss-attack, Modal Flash, Fases, frontend) à vontade
+// sem gastar cota. Passa por repairArena igual à real. Fallback gerado por tema se o
+// arquivo não existir.
+// Carrega o JSON estático uma vez no startup (sem _comment).
+let MOCK_ARENA_FILE = null;
+try {
+  MOCK_ARENA_FILE = JSON.parse(readFileSync(new URL('./mockArena.json', import.meta.url)));
+  delete MOCK_ARENA_FILE._comment;
+} catch (e) {
+  console.warn('mockArena.json não encontrado/inválido — usando mock gerado por tema.', e.message);
+}
+
+function getMockArena(themeText) {
+  // Clona o arquivo estático (repairArena muta) ou cai no gerador por tema.
+  if (MOCK_ARENA_FILE) return JSON.parse(JSON.stringify(MOCK_ARENA_FILE));
+  return buildMockArena(themeText);
+}
+
+function buildMockArena(themeText) {
+  const t = themeText || 'o tema';
+  return {
+    phase1: [
+      {
+        text: `[MOCK] Joguei uma partida de ${t} e perdi, então é ÓBVIO que ${t} é furado e não presta pra ninguém.`,
+        fallacy: 'Generalização Apressada',
+        options: ['Generalização Apressada', 'Apelo à Autoridade Indevida', 'Falsa Dicotomia', 'Bola de Neve'],
+      },
+      {
+        text: `[MOCK] Um famoso influenciador disse que entende tudo de ${t}, então qualquer coisa que ele afirmar sobre o assunto é verdade absoluta.`,
+        fallacy: 'Apelo à Autoridade Indevida',
+        options: ['Apelo à Autoridade Indevida', 'Causa Falsa', 'Espantalho', 'Raciocínio Circular'],
+      },
+      {
+        text: `[MOCK] Ou você ama ${t} incondicionalmente, ou você odeia e quer destruir tudo. Não existe meio-termo.`,
+        fallacy: 'Falsa Dicotomia',
+        options: ['Falsa Dicotomia', 'Apelo à Emoção', 'Generalização Apressada', 'Ataque Pessoal'],
+      },
+    ],
+    phase2: [
+      {
+        text: `[MOCK] Desde que mudaram algo em ${t}, tudo piorou. Logo, essa mudança é a causa de todos os problemas.`,
+        boss_fallacy: 'Causa Falsa',
+        options: [
+          { card_type_bound: 'data', text_content: `Que evidência liga diretamente a mudança ao problema, e não apenas uma coincidência no tempo?`, is_correct: true, boss_damage: 22, player_damage: 0, feedback_text: 'Boa — você cobrou a prova do nexo causal; coincidência no tempo não é causa.' },
+          { card_type_bound: 'fallacy', text_content: `Você nem entende de ${t}, então sua opinião não conta.`, is_correct: false, boss_damage: 0, player_damage: 15, feedback_text: 'Isso é Ataque Pessoal — não refuta o argumento, ataca quem fala.' },
+          { card_type_bound: 'counter', text_content: `Concordo, ${t} virou um lixo total mesmo.`, is_correct: false, boss_damage: 0, player_damage: 12, feedback_text: 'Você aceitou a falácia em vez de questionar o nexo causal.' },
+        ],
+      },
+      {
+        text: `[MOCK] Se deixarem ${t} mudar um detalhe pequeno, logo vira o caos e em pouco tempo ${t} deixa de existir.`,
+        boss_fallacy: 'Bola de Neve',
+        options: [
+          { card_type_bound: 'fallacy', text_content: `Isso é Bola de Neve: um passo pequeno não leva inevitavelmente à catástrofe sem provar cada elo.`, is_correct: true, boss_damage: 23, player_damage: 0, feedback_text: 'Correto — você exigiu o nexo entre os passos da catástrofe anunciada.' },
+          { card_type_bound: 'data', text_content: `Cite a fonte que prova o caos.`, is_correct: false, boss_damage: 0, player_damage: 13, feedback_text: 'Pedir fonte é válido, mas o erro central é lógico (Bola de Neve), não factual.' },
+          { card_type_bound: 'counter', text_content: `Nenhuma mudança em ${t} jamais teve qualquer efeito.`, is_correct: false, boss_damage: 0, player_damage: 14, feedback_text: 'Negação absoluta é tão frágil quanto o exagero do Boss.' },
+        ],
+      },
+      {
+        text: `[MOCK] Quem critica ${t} claramente é um amargurado que nunca foi bom nisso, então a crítica não vale nada.`,
+        boss_fallacy: 'Ataque Pessoal',
+        options: [
+          { card_type_bound: 'counter', text_content: `A qualidade da crítica não depende de quem a faz — o argumento se sustenta ou não por si só.`, is_correct: true, boss_damage: 24, player_damage: 0, feedback_text: 'Correto — você separou o argumento da pessoa, desarmando o Ataque Pessoal.' },
+          { card_type_bound: 'fallacy', text_content: `Você também é um amargurado, então cale a boca.`, is_correct: false, boss_damage: 0, player_damage: 16, feedback_text: 'Você respondeu a um Ataque Pessoal com outro — dobrou a falácia.' },
+          { card_type_bound: 'data', text_content: `Prove que o crítico é amargurado.`, is_correct: false, boss_damage: 0, player_damage: 12, feedback_text: 'Entrou no jogo do Boss discutindo a pessoa em vez do argumento.' },
+        ],
+      },
+    ],
+    phase3_context: `[MOCK] Então você acha que entende de ${t}? Me prove com lógica de verdade: e se tudo que você considera "certo" em ${t} for só hábito disfarçado de razão? Defenda sua tese — se conseguir.`,
+  };
+}
+
 // Repara invariantes que o LLM às vezes viola — garante mecânica de jogo consistente.
 // Também DESCARTA o campo logical_verification (Chain-of-Thought interno da IA) para
 // manter o payload limpo e performático: ele nunca chega ao banco nem ao frontend.
@@ -725,6 +800,27 @@ app.post('/api/battle/generate-arena', async (req, res) => {
   }
   if (isBlocked(themeText)) {
     return res.status(400).json({ error: 'Tema bloqueado pelas diretrizes de conteúdo.' });
+  }
+
+  // ── MODO MOCK: pula o Groq por completo (0 tokens) ─────────────────────────
+  // Ativado por MOCK_ARENA=1 no .env OU pelo body { mock: true } na requisição.
+  // Útil para testar o fluxo do jogo sem consumir a cota da API.
+  if (process.env.MOCK_ARENA === '1' || req.body?.mock === true) {
+    try {
+      const arena = repairArena(getMockArena(themeText));
+      await pool.query(
+        `UPDATE user_stats
+           SET arena_data = $1, arena_theme = $2,
+               current_expected_option = NULL,
+               current_boss_hp = 100, current_player_hp = 100
+         WHERE user_id = $3`,
+        [JSON.stringify(arena), themeText, userId]
+      );
+      return res.json({ ok: true, theme: themeText, turns: 9, mock: true });
+    } catch (error) {
+      console.error('Erro ao gerar arena MOCK:', error);
+      return res.status(500).json({ error: 'Falha ao gerar arena mock.' });
+    }
   }
 
   try {
@@ -1235,6 +1331,29 @@ app.post('/api/battle', async (req, res) => {
     }
 
     return applyOutcomeAndRespond(res, { user_id, userArgument, cardType: expected?.card_type_bound ?? cardType, responseTimeMs, phase, gameData });
+  }
+
+  // ── MODO MOCK: Fase 3 sem Groq (0 tokens) ──────────────────────────────────
+  // Avalia de forma simplista: gibberish curto → punição; senão pontua razoável.
+  if (process.env.MOCK_ARENA === '1') {
+    const words = userArgument.trim().split(/\s+/).filter(Boolean);
+    const looksValid = words.length >= 6 && userArgument.trim().length >= 25;
+    const gameData = looksValid
+      ? {
+          boss_damage: 20, player_damage: 0, critical_hit: true,
+          reply: '[MOCK] Argumento aceito pelo simulador. Estrutura coerente — o Boss real seria mais cruel.',
+          feedback: '[MOCK] Avaliação simulada: claim/data/warrant razoáveis. Sem chamada de IA.',
+          toulmin_score: { claim: 2, data: 2, warrant: 2 },
+          fallacy_detected: null, play_valid: true,
+        }
+      : {
+          boss_damage: 0, player_damage: 25, critical_hit: false,
+          reply: '[MOCK] Isso foi curto demais pra ser um argumento. Tente algo com nexo.',
+          feedback: '[MOCK] Avaliação simulada: texto raso/incoerente.',
+          toulmin_score: { claim: 0, data: 0, warrant: 0 },
+          fallacy_detected: null, play_valid: false,
+        };
+    return applyOutcomeAndRespond(res, { user_id, userArgument, cardType, responseTimeMs, phase, gameData });
   }
 
   // Seleciona o prompt base pela fase; fase 1/2 injetam instrução de carta se houver

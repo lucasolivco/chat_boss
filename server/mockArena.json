@@ -1,0 +1,50 @@
+{
+  "_comment": "Arena MOCK estática (tema: Pokémon) para testes sem gastar tokens do Groq. Servida por POST /api/battle/generate-arena quando MOCK_ARENA=1 ou body { mock: true }. Para atualizar: gere uma arena real, copie o arena_data do banco (user_stats.arena_data) e cole aqui. Passa por repairArena normalmente.",
+  "phase1": [
+    {
+      "text": "Perdi uma vez pra um Magikarp usando Splash. Conclusão óbvia: o Magikarp é o Pokémon mais quebrado do jogo e precisa de nerf urgente.",
+      "fallacy": "Generalização Apressada",
+      "options": ["Generalização Apressada", "Causa Falsa", "Apelo à Emoção", "Falsa Dicotomia"]
+    },
+    {
+      "text": "O streamer mais famoso do mundo disse que Charizard é o melhor inicial. Ele tem 10 milhões de seguidores, então tá decidido, fim de papo.",
+      "fallacy": "Apelo à Autoridade Indevida",
+      "options": ["Apelo à Autoridade Indevida", "Raciocínio Circular", "Bola de Neve", "Ataque Pessoal"]
+    },
+    {
+      "text": "Ou você só usa lendários no time, ou você é um treinador casual que nunca vai ganhar nada. Não existe meio-termo nesse mundo.",
+      "fallacy": "Falsa Dicotomia",
+      "options": ["Falsa Dicotomia", "Generalização Apressada", "Apelo à Emoção", "Causa Falsa"]
+    }
+  ],
+  "phase2": [
+    {
+      "text": "Desde que adicionaram o tipo Fada, o competitivo ficou um saco. Logo, foi a Fada que destruiu toda a diversão do jogo.",
+      "boss_fallacy": "Causa Falsa",
+      "options": [
+        { "card_type_bound": "data", "text_content": "Que dado mostra que a Fada CAUSOU o tédio, e não só apareceu junto com outras mudanças?", "is_correct": true, "boss_damage": 22, "player_damage": 0, "feedback_text": "Boa — coincidência no tempo não é causa: a Fada chegou junto, não necessariamente causou." },
+        { "card_type_bound": "fallacy", "text_content": "Quem reclama da Fada é só quem não sabe jogar mesmo.", "is_correct": false, "boss_damage": 0, "player_damage": 15, "feedback_text": "Isso é Ataque Pessoal — ataca o jogador, não o argumento." },
+        { "card_type_bound": "counter", "text_content": "Verdade, o jogo morreu por completo depois da Fada.", "is_correct": false, "boss_damage": 0, "player_damage": 12, "feedback_text": "Você aceitou a falácia em vez de questionar o nexo causal." }
+      ]
+    },
+    {
+      "text": "Se nerfarem o Charizard, os fãs se revoltam, aí a base de jogadores some, e em um ano a franquia inteira vai à falência.",
+      "boss_fallacy": "Bola de Neve",
+      "options": [
+        { "card_type_bound": "fallacy", "text_content": "Isso é Bola de Neve: um nerf não leva inevitavelmente à falência sem provar cada passo da cadeia.", "is_correct": true, "boss_damage": 23, "player_damage": 0, "feedback_text": "Correto — você cobrou o nexo entre os passos da catástrofe anunciada." },
+        { "card_type_bound": "data", "text_content": "Cite a fonte que prova que a franquia vai falir.", "is_correct": false, "boss_damage": 0, "player_damage": 13, "feedback_text": "Pedir fonte é válido, mas o erro central é lógico (Bola de Neve), não factual." },
+        { "card_type_bound": "counter", "text_content": "Nerf nenhum jamais afetou jogador nenhum, em jogo nenhum.", "is_correct": false, "boss_damage": 0, "player_damage": 14, "feedback_text": "Negação absoluta é tão frágil quanto o exagero do Boss." }
+      ]
+    },
+    {
+      "text": "Você defende o Pikachu? Aposto que só joga porque viu o desenho na infância e nunca subiu de elo. Argumento descartado.",
+      "boss_fallacy": "Ataque Pessoal",
+      "options": [
+        { "card_type_bound": "counter", "text_content": "Gostar do desenho não muda se o Pikachu é bom — isso se decide no jogo, não na minha biografia.", "is_correct": true, "boss_damage": 24, "player_damage": 0, "feedback_text": "Correto — você separou o argumento da pessoa, desarmando o Ataque Pessoal." },
+        { "card_type_bound": "fallacy", "text_content": "E você é um sweat sem vida social, então cala a boca.", "is_correct": false, "boss_damage": 0, "player_damage": 16, "feedback_text": "Respondeu a um Ataque Pessoal com outro — dobrou a falácia." },
+        { "card_type_bound": "data", "text_content": "Prova que eu vi o desenho na infância.", "is_correct": false, "boss_damage": 0, "player_damage": 12, "feedback_text": "Entrou na discussão sobre a pessoa, não sobre o argumento." }
+      ]
+    }
+  ],
+  "phase3_context": "Então você se acha o melhor treinador? Responde essa: se capturar Pokémon é 'fazer amigos', por que a gente tranca eles numa Pokébola e manda brigar até desmaiar? Defenda a ética do seu sonho de infância — se tiver coragem."
+}

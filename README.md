@@ -338,6 +338,19 @@ Acesse: **http://localhost:5173**
 
 > **Atenção (Windows):** PostgreSQL nativo ocupa a porta 5432. O projeto usa **5433**. Não alterar.
 
+### Modo MOCK — desenvolver sem gastar tokens do Groq
+
+Para mexer em UI/animações/fluxo sem consumir a cota da API:
+
+```powershell
+cd server; $env:MOCK_ARENA=1; node server.js   # ou MOCK_ARENA=1 node server.js (bash)
+```
+
+Com `MOCK_ARENA=1` (ou enviando `{ mock: true }` no body de `/api/battle/generate-arena`), o backend
+serve a arena estática **`server/mockArena.json`** (sem chamar o Groq, ~15ms) e a Fase 3 é avaliada por
+heurística simples. Um duelo completo roda com **zero tokens**. Para atualizar o mock, gere uma arena
+real, copie `user_stats.arena_data` do banco e cole em `server/mockArena.json`.
+
 ---
 
 ## Estrutura de Arquivos
