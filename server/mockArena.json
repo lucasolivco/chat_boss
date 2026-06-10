@@ -37,12 +37,12 @@
       ]
     },
     {
-      "text": "Você defende o Pikachu? Aposto que só joga porque viu o desenho na infância e nunca subiu de elo. Argumento descartado.",
-      "boss_fallacy": "Ataque Pessoal",
+      "text": "O Charizard é o melhor justamente porque é o mais forte — e ele é o mais forte porque é o melhor. Tá explicado.",
+      "boss_fallacy": "Raciocínio Circular",
       "options": [
-        { "card_type_bound": "counter", "text_content": "Gostar do desenho não muda se o Pikachu é bom — isso se decide no jogo, não na minha biografia.", "is_correct": true, "boss_damage": 24, "player_damage": 0, "feedback_text": "Correto — você separou o argumento da pessoa, desarmando o Ataque Pessoal." },
-        { "card_type_bound": "fallacy", "text_content": "E você é um sweat sem vida social, então cala a boca.", "is_correct": false, "boss_damage": 0, "player_damage": 16, "feedback_text": "Respondeu a um Ataque Pessoal com outro — dobrou a falácia." },
-        { "card_type_bound": "data", "text_content": "Prova que eu vi o desenho na infância.", "is_correct": false, "boss_damage": 0, "player_damage": 12, "feedback_text": "Entrou na discussão sobre a pessoa, não sobre o argumento." }
+        { "card_type_bound": "fallacy", "text_content": "Isso é Raciocínio Circular: a conclusão já está na premissa — 'melhor porque forte, forte porque melhor' não prova nada.", "is_correct": true, "boss_damage": 12, "player_damage": 0, "feedback_text": "Correto — o argumento gira em círculo, usando a própria conclusão como prova." },
+        { "card_type_bound": "data", "text_content": "Que stats ou win rate provam que o Charizard é o mais forte?", "is_correct": false, "boss_damage": 0, "player_damage": 13, "feedback_text": "Pedir dado é válido, mas o erro central aqui é a circularidade." },
+        { "card_type_bound": "counter", "text_content": "Verdade, Charizard é insuperável mesmo.", "is_correct": false, "boss_damage": 0, "player_damage": 14, "feedback_text": "Você aceitou a premissa circular em vez de quebrá-la." }
       ]
     }
   ],

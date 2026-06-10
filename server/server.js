@@ -121,6 +121,13 @@ const FALLACY_NAMES = [
   'Apelo à Emoção', 'Causa Falsa',
 ];
 
+// Falácias REATIVAS — precisam de um oponente/argumento prévio para existir.
+// Como o Boss ATACA PRIMEIRO nas Fases 1 e 2, elas ficam incoerentes ali (não há
+// argumento nem pessoa a atacar). São permitidas só na Fase 3 (já há diálogo).
+const REACTIVE_FALLACIES = ['Ataque Pessoal', 'Espantalho'];
+// Falácias válidas como AFIRMAÇÃO DE ABERTURA (o Boss comete sozinho, sem oponente).
+const OPENING_FALLACIES = FALLACY_NAMES.filter(f => !REACTIVE_FALLACIES.includes(f));
+
 // ─── Validação da ARENA gerada por IA (Pre-Generation Hack) ───────────────────
 // Estrutura completa dos 9 turnos produzida numa única chamada ao Groq.
 const arenaOptionSchema = z.object({
@@ -696,17 +703,24 @@ Portanto os textos das Fases 1 e 2 são AFIRMAÇÕES DE ABERTURA do Boss. É PRO
 "você disse", "sua tese", "como você afirmou" ou reagir a uma fala do jogador que não existe. O Boss
 apresenta a PRÓPRIA posição (falaciosa) sobre o tema, provocando o jogador a identificar/refutar.
 
+🚫 FALÁCIAS REATIVAS (NUNCA use "${REACTIVE_FALLACIES.join('" nem "')}" como a falácia cometida nas Fases 1 e 2):
+elas só existem quando há um oponente/argumento para atacar ou distorcer — e aqui o Boss fala PRIMEIRO,
+sozinho, sem ninguém para atacar. Usá-las na abertura é incoerente ("atacar quem fala" sem ninguém ter falado).
+Nas Fases 1 e 2, o campo "fallacy"/"boss_fallacy" DEVE ser uma destas (afirmações que o Boss comete sozinho):
+${OPENING_FALLACIES.map(f => `"${f}"`).join(', ')}.
+(Ataque Pessoal e Espantalho podem aparecer só como DISTRATORES nas options, e como falácia real apenas na Fase 3.)
+
 ═══ DEFINIÇÕES RÍGIDAS DAS FALÁCIAS (siga ao pé da letra — NÃO confunda os conceitos) ═══
 Use SOMENTE estes nomes, em pt-br, exatamente assim:
-- Espantalho: como o jogador ainda não falou, distorça/exagere uma OPINIÃO COMUM e bem conhecida do tema (uma versão caricata da posição popular) e ataque essa versão fraca. NUNCA distorça "o argumento do jogador" — ele não existe ainda. Ex (Pokémon): "Quem gosta de Pokémon água acha que é só jogar Surf e ganhar — que estratégia ridícula e rasa."
 - Generalização Apressada: use UM único caso isolado, uma experiência pessoal ou um detalhe ínfimo do tema e afirme que aquilo dita a regra para 100% do universo do tema.
 - Apelo à Autoridade Indevida: cite uma figura FAMOSA do tema opinando sobre algo FORA de sua área técnica, validando como verdade absoluta só pelo nome.
 - Bola de Neve: afirme que uma pequena ação no tema INEVITAVELMENTE causará um apocalipse ou consequência catastrófica, sem nexo causal direto entre os passos.
-- Ataque Pessoal: ataque a característica, gosto ou credibilidade de QUEM defende a ideia, em vez do mérito do argumento.
 - Falsa Dicotomia: apresente apenas DOIS extremos como únicas opções possíveis, ignorando todo o espectro intermediário.
 - Raciocínio Circular: faça a conclusão já estar embutida na premissa (o argumento prova a si mesmo).
 - Apelo à Emoção: use medo, pena, nostalgia ou indignação NO LUGAR de evidência lógica.
 - Causa Falsa: confunda correlação ou coincidência temporal com causalidade real.
+- (REATIVAS — só Fase 3) Ataque Pessoal: ataca a credibilidade de QUEM argumenta, não o argumento.
+- (REATIVAS — só Fase 3) Espantalho: distorce o argumento do oponente para refutar uma versão fraca dele.
 
 ═══ REGRA DE OURO: COERÊNCIA CONTEXTUAL (proibido paradoxo) ═══
 O argumento do Boss deve ser logicamente INVÁLIDO (uma falácia), mas contextual e narrativamente COERENTE. As relações de causa e efeito DEVEM respeitar as regras básicas e o bom senso do tema "${themeText}".
@@ -723,14 +737,14 @@ ESTRUTURA A GERAR:
 ▸ FASE 1 — "phase1": array de EXATAMENTE 3 objetos. Cada objeto:
   - "logical_verification": (raciocínio interno, 1 frase) a falácia escolhida + checagem de coerência: a premissa leva à conclusão sem paradoxo, respeitando o bom senso do tema?
   - "text": afirmação ARROGANTE e ENGRAÇADA do MECHA-LOGIC sobre o tema, NO MÁXIMO 2-3 frases CURTAS (use memes/clichês populares do tema), que comete EXATAMENTE a falácia de "fallacy". Lógica 100% precisa, embalagem cômica.
-  - "fallacy": o nome EXATO (do catálogo) da falácia cometida no "text".
-  - "options": array de EXATAMENTE 4 nomes de falácias do catálogo — DEVE incluir o valor de "fallacy" e mais 3 distratores plausíveis. Embaralhe a ordem.
+  - "fallacy": o nome EXATO da falácia cometida no "text". ⚠️ DEVE ser uma das de ABERTURA (${OPENING_FALLACIES.map(f => `"${f}"`).join(', ')}). NUNCA Ataque Pessoal nem Espantalho aqui.
+  - "options": array de EXATAMENTE 4 nomes de falácias do catálogo — DEVE incluir o valor de "fallacy" e mais 3 distratores plausíveis (os distratores PODEM incluir Ataque Pessoal/Espantalho). Embaralhe a ordem.
   As 3 falácias corretas das 3 rodadas devem ser DIFERENTES entre si.
 
 ▸ FASE 2 — "phase2": array de EXATAMENTE 3 objetos. Cada objeto:
   - "logical_verification": (raciocínio interno, 1 frase) a falácia escolhida + checagem de coerência: a premissa leva à conclusão sem paradoxo, respeitando o bom senso do tema?
   - "text": argumento capcioso e ZOEIRO do MECHA-LOGIC sobre o tema, NO MÁXIMO 2-3 frases CURTAS (memes/clichês do tema), que comete a falácia de "boss_fallacy" de forma sutil mas logicamente precisa.
-  - "boss_fallacy": o nome EXATO (do catálogo) da falácia cometida.
+  - "boss_fallacy": o nome EXATO da falácia cometida. ⚠️ DEVE ser uma das de ABERTURA (${OPENING_FALLACIES.map(f => `"${f}"`).join(', ')}). NUNCA Ataque Pessoal nem Espantalho aqui.
   - "options": array de EXATAMENTE 3 réplicas possíveis do jogador. Cada réplica:
       • "card_type_bound": "fallacy" (aponta a falácia), "data" (exige dados/fonte) ou "counter" (contra-argumenta).
       • "text_content": a frase da réplica (1-2 frases, com vocabulário do tema).
@@ -812,12 +826,12 @@ function buildMockArena(themeText) {
         ],
       },
       {
-        text: `[MOCK] Quem critica ${t} claramente é um amargurado que nunca foi bom nisso, então a crítica não vale nada.`,
-        boss_fallacy: 'Ataque Pessoal',
+        text: `[MOCK] ${t} é simplesmente o melhor que existe — e a prova disso é que nada nunca vai superar ${t}. Óbvio, né?`,
+        boss_fallacy: 'Raciocínio Circular',
         options: [
-          { card_type_bound: 'counter', text_content: `A qualidade da crítica não depende de quem a faz — o argumento se sustenta ou não por si só.`, is_correct: true, boss_damage: 24, player_damage: 0, feedback_text: 'Correto — você separou o argumento da pessoa, desarmando o Ataque Pessoal.' },
-          { card_type_bound: 'fallacy', text_content: `Você também é um amargurado, então cale a boca.`, is_correct: false, boss_damage: 0, player_damage: 16, feedback_text: 'Você respondeu a um Ataque Pessoal com outro — dobrou a falácia.' },
-          { card_type_bound: 'data', text_content: `Prove que o crítico é amargurado.`, is_correct: false, boss_damage: 0, player_damage: 12, feedback_text: 'Entrou no jogo do Boss discutindo a pessoa em vez do argumento.' },
+          { card_type_bound: 'fallacy', text_content: `Isso é Raciocínio Circular: a conclusão ("é o melhor") já está embutida na premissa — não prova nada.`, is_correct: true, boss_damage: 12, player_damage: 0, feedback_text: 'Correto — o argumento gira em círculo: usa a própria conclusão como prova.' },
+          { card_type_bound: 'data', text_content: `Qual critério OBJETIVO mede esse "melhor"?`, is_correct: false, boss_damage: 0, player_damage: 13, feedback_text: 'Boa pergunta, mas o erro central é a circularidade, não a falta de dado.' },
+          { card_type_bound: 'counter', text_content: `Concordo, ${t} é insuperável mesmo.`, is_correct: false, boss_damage: 0, player_damage: 14, feedback_text: 'Você aceitou a premissa circular em vez de quebrá-la.' },
         ],
       },
     ],
@@ -828,10 +842,46 @@ function buildMockArena(themeText) {
 // Repara invariantes que o LLM às vezes viola — garante mecânica de jogo consistente.
 // Também DESCARTA o campo logical_verification (Chain-of-Thought interno da IA) para
 // manter o payload limpo e performático: ele nunca chega ao banco nem ao frontend.
-function repairArena(arena) {
+function repairArena(arena, themeText = 'o tema') {
   // Normaliza a contagem: exatamente 3 ataques por fase (a IA às vezes gera 4+).
   arena.phase1 = arena.phase1.slice(0, 3);
   arena.phase2 = arena.phase2.slice(0, 3);
+
+  // ── Rede de segurança ANTI-FALÁCIA-REATIVA na abertura ────────────────────
+  // Se a IA ignorou a regra e usou Ataque Pessoal/Espantalho como falácia cometida
+  // numa abertura (Fases 1/2), troca o ataque inteiro por uma abertura COERENTE do
+  // pool interno (theme-interpolado), com falácia ainda não usada naquela fase.
+  const fb = buildMockArena(themeText);
+  const pickFallback = (pool, used, key) => {
+    const cand = pool.find(f => !used.has(f[key]));
+    return cand || pool[0];
+  };
+  {
+    const used = new Set();
+    arena.phase1.forEach(a => { if (a?.fallacy && !REACTIVE_FALLACIES.includes(a.fallacy)) used.add(a.fallacy); });
+    arena.phase1 = arena.phase1.map(a => {
+      if (!a?.fallacy || REACTIVE_FALLACIES.includes(a.fallacy)) {
+        const repl = pickFallback(fb.phase1, used, 'fallacy');
+        used.add(repl.fallacy);
+        console.warn(`[arena] Fase 1: falácia reativa "${a?.fallacy}" trocada por "${repl.fallacy}" (abertura coerente).`);
+        return { ...repl };
+      }
+      return a;
+    });
+  }
+  {
+    const used = new Set();
+    arena.phase2.forEach(a => { if (a?.boss_fallacy && !REACTIVE_FALLACIES.includes(a.boss_fallacy)) used.add(a.boss_fallacy); });
+    arena.phase2 = arena.phase2.map(a => {
+      if (!a?.boss_fallacy || REACTIVE_FALLACIES.includes(a.boss_fallacy)) {
+        const repl = pickFallback(fb.phase2, used, 'boss_fallacy');
+        used.add(repl.boss_fallacy);
+        console.warn(`[arena] Fase 2: falácia reativa "${a?.boss_fallacy}" trocada por "${repl.boss_fallacy}" (abertura coerente).`);
+        return { ...repl };
+      }
+      return a;
+    });
+  }
 
   // Fase 1: garante que options contenha a falácia correta e tenha 4 itens.
   arena.phase1 = arena.phase1.map(a => {
@@ -894,7 +944,7 @@ app.post('/api/battle/generate-arena', async (req, res) => {
   // Útil para testar o fluxo do jogo sem consumir a cota da API.
   if (process.env.MOCK_ARENA === '1' || req.body?.mock === true) {
     try {
-      const arena = repairArena(getMockArena(themeText));
+      const arena = repairArena(getMockArena(themeText), themeText);
       await pool.query(
         `UPDATE user_stats
            SET arena_data = $1, arena_theme = $2,
@@ -956,7 +1006,7 @@ app.post('/api/battle/generate-arena', async (req, res) => {
       });
     }
 
-    const arena = repairArena(parsed.data);
+    const arena = repairArena(parsed.data, themeText);
 
     // Persiste a arena + reseta HP e gabarito para um duelo limpo.
     await pool.query(
